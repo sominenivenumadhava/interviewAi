@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="001-create-refresh-tokens-table" author="interviai-team">
+        <comment>Create refresh_tokens table for JWT authentication</comment>
+        
+        <createTable tableName="refresh_tokens">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            
+            <column name="token" type="VARCHAR(500)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="expires_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="is_revoked" type="BOOLEAN" defaultValue="false">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="user_agent" type="VARCHAR(1000)">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="ip_address" type="VARCHAR(45)">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="device_id" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="last_used_at" type="TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="version" type="BIGINT" defaultValue="0">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="refresh_tokens" indexName="idx_refresh_tokens_token">
+            <column name="token"/>
+        </createIndex>
+
+        <createIndex tableName="refresh_tokens" indexName="idx_refresh_tokens_user_id">
+            <column name="user_id"/>
+        </createIndex>
+
+        <createIndex tableName="refresh_tokens" indexName="idx_refresh_tokens_expires_at">
+            <column name="expires_at"/>
+        </createIndex>
+
+        <createIndex tableName="refresh_tokens" indexName="idx_refresh_tokens_device_id">
+            <column name="device_id"/>
+        </createIndex>
+
+        <createIndex tableName="refresh_tokens" indexName="idx_refresh_tokens_created_at">
+            <column name="created_at"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="refresh_tokens"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

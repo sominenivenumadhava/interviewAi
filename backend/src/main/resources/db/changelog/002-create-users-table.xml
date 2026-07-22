@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="002-create-users-table" author="InterviAI-System">
+        
+        <!-- Create users table -->
+        <createTable tableName="users">
+            <!-- Primary key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Basic user information -->
+            <column name="email" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            
+            <column name="username" type="VARCHAR(50)">
+                <constraints nullable="true" unique="true"/>
+            </column>
+            
+            <column name="password_hash" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="first_name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="last_name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="phone" type="VARCHAR(20)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Email verification -->
+            <column name="email_verified" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="email_verification_token" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="email_verification_expires_at" type="TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Password reset -->
+            <column name="password_reset_token" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="password_reset_expires_at" type="TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Login tracking -->
+            <column name="last_login_at" type="TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="login_attempts" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="account_locked_until" type="TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Profile information -->
+            <column name="profile_picture_url" type="VARCHAR(500)">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="bio" type="VARCHAR(1000)">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="timezone" type="VARCHAR(50)" defaultValue="UTC">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="language" type="VARCHAR(10)" defaultValue="en">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Role and permissions -->
+            <column name="role" type="VARCHAR(20)" defaultValue="USER">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Terms and privacy -->
+            <column name="terms_accepted_at" type="TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="privacy_accepted_at" type="TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- Email preferences -->
+            <column name="marketing_emails_enabled" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="notification_emails_enabled" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Audit fields (from AuditableEntity) -->
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="created_by" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="updated_by" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="version" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Create indexes -->
+        <createIndex indexName="idx_users_email" tableName="users" unique="true">
+            <column name="email"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_users_username" tableName="users" unique="true">
+            <column name="username"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_users_created_at" tableName="users">
+            <column name="created_at"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_users_last_login" tableName="users">
+            <column name="last_login_at"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_users_email_verified" tableName="users">
+            <column name="email_verified"/>
+        </createIndex>
+
+        <!-- Add check constraint for role enum -->
+        <sql>
+            ALTER TABLE users ADD CONSTRAINT chk_users_role 
+            CHECK (role IN ('USER', 'MODERATOR', 'ADMIN'));
+        </sql>
+
+        <!-- Add foreign key for created_by and updated_by (self-referencing) -->
+        <addForeignKeyConstraint
+            baseTableName="users"
+            baseColumnNames="created_by"
+            referencedTableName="users"
+            referencedColumnNames="id"
+            constraintName="fk_users_created_by"
+            onDelete="SET NULL"/>
+        
+        <addForeignKeyConstraint
+            baseTableName="users"
+            baseColumnNames="updated_by"
+            referencedTableName="users"
+            referencedColumnNames="id"
+            constraintName="fk_users_updated_by"
+            onDelete="SET NULL"/>
+
+    </changeSet>
+
+</databaseChangeLog>

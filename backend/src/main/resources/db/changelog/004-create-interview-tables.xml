@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- ==================== INTERVIEWS TABLE ==================== -->
+    <changeSet id="004-01-create-interviews-table" author="interviai-team">
+        <createTable tableName="interviews">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="version" type="BIGINT" defaultValueNumeric="0"/>
+            <column name="created_by" type="UUID"/>
+            <column name="updated_by" type="UUID"/>
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_deleted" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Foreign Keys -->
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_interviews_user_id"
+                             references="users(id)"/>
+            </column>
+            <column name="resume_id" type="UUID">
+                <constraints nullable="true"
+                             foreignKeyName="fk_interviews_resume_id"
+                             references="resumes(id)"/>
+            </column>
+
+            <!-- Core Fields -->
+            <column name="session_id" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_interviews_session_id"/>
+            </column>
+            <column name="title" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="company" type="VARCHAR(100)"/>
+            <column name="role" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="job_description" type="TEXT"/>
+            <column name="interview_type" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="difficulty_level" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Scheduling -->
+            <column name="scheduled_at" type="TIMESTAMP"/>
+            <column name="started_at" type="TIMESTAMP"/>
+            <column name="completed_at" type="TIMESTAMP"/>
+            <column name="duration_minutes" type="INTEGER"/>
+            <column name="actual_duration" type="BIGINT"/>
+
+            <!-- Scores & Feedback -->
+            <column name="overall_score" type="DOUBLE PRECISION"/>
+            <column name="overall_feedback" type="TEXT"/>
+            <column name="strengths" type="TEXT"/>
+            <column name="improvements" type="TEXT"/>
+
+            <!-- JSON Config -->
+            <column name="configuration" type="JSONB"/>
+            <column name="metadata" type="JSONB"/>
+        </createTable>
+
+        <createIndex tableName="interviews" indexName="idx_interviews_user_id">
+            <column name="user_id"/>
+        </createIndex>
+        <createIndex tableName="interviews" indexName="idx_interviews_session_id">
+            <column name="session_id"/>
+        </createIndex>
+        <createIndex tableName="interviews" indexName="idx_interviews_status">
+            <column name="status"/>
+        </createIndex>
+        <createIndex tableName="interviews" indexName="idx_interviews_completed_at">
+            <column name="completed_at"/>
+        </createIndex>
+        <createIndex tableName="interviews" indexName="idx_interviews_user_status">
+            <column name="user_id"/>
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== INTERVIEW QUESTIONS TABLE ==================== -->
+    <changeSet id="004-02-create-interview-questions-table" author="interviai-team">
+        <createTable tableName="interview_questions">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="version" type="BIGINT" defaultValueNumeric="0"/>
+
+            <column name="interview_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_interview_questions_interview_id"
+                             references="interviews(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="question_order" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="question_text" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="category" type="VARCHAR(100)"/>
+            <column name="difficulty_level" type="VARCHAR(20)"/>
+            <column name="expected_time_minutes" type="INTEGER"/>
+            <column name="ai_generated" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reference_answer" type="TEXT"/>
+            <column name="hints" type="TEXT"/>
+            <column name="metadata" type="JSONB"/>
+        </createTable>
+
+        <createIndex tableName="interview_questions" indexName="idx_interview_questions_interview_id">
+            <column name="interview_id"/>
+        </createIndex>
+        <createIndex tableName="interview_questions" indexName="idx_interview_questions_order">
+            <column name="interview_id"/>
+            <column name="question_order"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== QUESTION EVALUATION CRITERIA (element collection) ==================== -->
+    <changeSet id="004-03-create-question-evaluation-criteria-table" author="interviai-team">
+        <createTable tableName="question_evaluation_criteria">
+            <column name="question_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_qec_question_id"
+                             references="interview_questions(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="criteria" type="VARCHAR(500)"/>
+        </createTable>
+
+        <createIndex tableName="question_evaluation_criteria" indexName="idx_qec_question_id">
+            <column name="question_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== QUESTION FOLLOW-UPS (element collection) ==================== -->
+    <changeSet id="004-04-create-question-follow-ups-table" author="interviai-team">
+        <createTable tableName="question_follow_ups">
+            <column name="question_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_qfu_question_id"
+                             references="interview_questions(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="follow_up" type="TEXT"/>
+        </createTable>
+
+        <createIndex tableName="question_follow_ups" indexName="idx_qfu_question_id">
+            <column name="question_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== INTERVIEW ANSWERS TABLE ==================== -->
+    <changeSet id="004-05-create-interview-answers-table" author="interviai-team">
+        <createTable tableName="interview_answers">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="version" type="BIGINT" defaultValueNumeric="0"/>
+
+            <column name="interview_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_interview_answers_interview_id"
+                             references="interviews(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="question_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_interview_answers_question_id"
+                             references="interview_questions(id)"
+                             deleteCascade="true"/>
+            </column>
+
+            <!-- Answer Content -->
+            <column name="answer_text" type="TEXT"/>
+            <column name="answer_audio_url" type="VARCHAR(500)"/>
+            <column name="answer_video_url" type="VARCHAR(500)"/>
+
+            <!-- Timing -->
+            <column name="started_at" type="TIMESTAMP"/>
+            <column name="submitted_at" type="TIMESTAMP"/>
+            <column name="time_taken" type="BIGINT"/>
+
+            <!-- Evaluation -->
+            <column name="score" type="DOUBLE PRECISION"/>
+            <column name="rating" type="VARCHAR(50)"/>
+            <column name="feedback" type="TEXT"/>
+            <column name="suggested_answer" type="TEXT"/>
+            <column name="ai_evaluation" type="JSONB"/>
+
+            <!-- Sub-scores -->
+            <column name="confidence_score" type="DOUBLE PRECISION"/>
+            <column name="clarity_score" type="DOUBLE PRECISION"/>
+            <column name="relevance_score" type="DOUBLE PRECISION"/>
+            <column name="technical_accuracy_score" type="DOUBLE PRECISION"/>
+
+            <column name="metadata" type="JSONB"/>
+        </createTable>
+
+        <addUniqueConstraint
+            tableName="interview_answers"
+            columnNames="question_id"
+            constraintName="uq_interview_answers_question_id"/>
+
+        <createIndex tableName="interview_answers" indexName="idx_interview_answers_interview_id">
+            <column name="interview_id"/>
+        </createIndex>
+        <createIndex tableName="interview_answers" indexName="idx_interview_answers_question_id">
+            <column name="question_id"/>
+        </createIndex>
+        <createIndex tableName="interview_answers" indexName="idx_interview_answers_submitted_at">
+            <column name="submitted_at"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== ANSWER STRENGTHS (element collection) ==================== -->
+    <changeSet id="004-06-create-answer-strengths-table" author="interviai-team">
+        <createTable tableName="answer_strengths">
+            <column name="answer_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_as_answer_id"
+                             references="interview_answers(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="strength" type="VARCHAR(500)"/>
+        </createTable>
+
+        <createIndex tableName="answer_strengths" indexName="idx_as_answer_id">
+            <column name="answer_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== ANSWER IMPROVEMENTS (element collection) ==================== -->
+    <changeSet id="004-07-create-answer-improvements-table" author="interviai-team">
+        <createTable tableName="answer_improvements">
+            <column name="answer_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_ai_answer_id"
+                             references="interview_answers(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="improvement" type="VARCHAR(500)"/>
+        </createTable>
+
+        <createIndex tableName="answer_improvements" indexName="idx_ai_answer_id">
+            <column name="answer_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

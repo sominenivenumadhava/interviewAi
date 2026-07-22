@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- ==================== JOB SEARCHES TABLE ==================== -->
+    <changeSet id="005-01-create-job-searches-table" author="interviai-team">
+        <createTable tableName="job_searches">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_job_searches_user_id"
+                             references="users(id)"/>
+            </column>
+            <column name="designation" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="location" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="filters_json" type="TEXT"/>
+            <column name="linkedin_search_url" type="VARCHAR(1000)"/>
+            <column name="apify_run_id" type="VARCHAR(255)"/>
+            <column name="apify_dataset_id" type="VARCHAR(255)"/>
+            <column name="status" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="requested_job_count" type="INTEGER"/>
+            <column name="result_count" type="INTEGER"/>
+            <column name="error_message" type="TEXT"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="completed_at" type="TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ==================== SAVED JOBS TABLE ==================== -->
+    <changeSet id="005-02-create-saved-jobs-table" author="interviai-team">
+        <createTable tableName="saved_jobs">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_saved_jobs_user_id"
+                             references="users(id)"/>
+            </column>
+            <column name="external_job_id" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="title" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="company_name" type="VARCHAR(255)"/>
+            <column name="location" type="VARCHAR(255)"/>
+            <column name="job_url" type="VARCHAR(1000)"/>
+            <column name="raw_data_json" type="TEXT"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <!-- Unique constraint for (user_id, external_job_id) to avoid duplicate saves per user -->
+        <addUniqueConstraint tableName="saved_jobs" 
+                             columnNames="user_id, external_job_id" 
+                             constraintName="uq_saved_jobs_user_external_id"/>
+    </changeSet>
+
+</databaseChangeLog>

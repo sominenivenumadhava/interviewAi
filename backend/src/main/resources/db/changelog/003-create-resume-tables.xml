@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="003-create-resume-tables" author="InterviAI-System">
+        
+        <!-- Create resumes table -->
+        <createTable tableName="resumes">
+            <!-- Primary key -->
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Foreign key to users -->
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Resume metadata -->
+            <column name="title" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="original_filename" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="file_path" type="VARCHAR(500)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="file_size" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="content_type" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Extracted and parsed content -->
+            <column name="extracted_text" type="TEXT"/>
+            
+            <column name="parsed_content" type="JSONB"/>
+
+            <!-- Personal information -->
+            <column name="full_name" type="VARCHAR(200)"/>
+            
+            <column name="email" type="VARCHAR(255)"/>
+            
+            <column name="phone" type="VARCHAR(20)"/>
+            
+            <column name="location" type="VARCHAR(200)"/>
+            
+            <column name="summary" type="TEXT"/>
+
+            <!-- Experience information -->
+            <column name="total_experience_years" type="INTEGER"/>
+            
+            <column name="total_experience_months" type="INTEGER"/>
+
+            <!-- Processing status -->
+            <column name="status" type="VARCHAR(20)" defaultValue="UPLOADED">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="is_primary" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="processing_started_at" type="TIMESTAMP"/>
+            
+            <column name="processing_completed_at" type="TIMESTAMP"/>
+            
+            <column name="processing_error" type="TEXT"/>
+            
+            <column name="parsing_confidence_score" type="DECIMAL(5,2)"/>
+
+            <!-- Audit fields -->
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="created_by" type="UUID"/>
+            
+            <column name="updated_by" type="UUID"/>
+            
+            <column name="version" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Create resume_educations table -->
+        <createTable tableName="resume_educations">
+            <!-- Primary key -->
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Foreign key to resumes -->
+            <column name="resume_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Education details -->
+            <column name="institution_name" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="degree" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="field_of_study" type="VARCHAR(100)"/>
+            
+            <column name="degree_type" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="start_date" type="DATE"/>
+            
+            <column name="end_date" type="DATE"/>
+            
+            <column name="is_current" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="gpa" type="DECIMAL(3,2)"/>
+            
+            <column name="max_gpa" type="DECIMAL(3,2)"/>
+            
+            <column name="percentage" type="DECIMAL(5,2)"/>
+            
+            <column name="grade" type="VARCHAR(10)"/>
+            
+            <column name="location" type="VARCHAR(100)"/>
+            
+            <column name="description" type="TEXT"/>
+            
+            <column name="honors" type="VARCHAR(200)"/>
+            
+            <column name="relevant_coursework" type="TEXT"/>
+            
+            <column name="activities" type="TEXT"/>
+            
+            <column name="display_order" type="INTEGER"/>
+
+            <!-- Audit fields (Base entity) -->
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Create resume_work_experiences table -->
+        <createTable tableName="resume_work_experiences">
+            <!-- Primary key -->
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Foreign key to resumes -->
+            <column name="resume_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Work experience details -->
+            <column name="company_name" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="job_title" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="employment_type" type="VARCHAR(50)" defaultValue="FULL_TIME"/>
+            
+            <column name="location" type="VARCHAR(100)"/>
+            
+            <column name="start_date" type="DATE"/>
+            
+            <column name="end_date" type="DATE"/>
+            
+            <column name="is_current" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="description" type="TEXT"/>
+            
+            <column name="key_achievements" type="TEXT"/>
+            
+            <column name="technologies_used" type="TEXT"/>
+            
+            <column name="industry" type="VARCHAR(100)"/>
+            
+            <column name="company_size" type="VARCHAR(50)"/>
+            
+            <column name="reporting_to" type="VARCHAR(100)"/>
+            
+            <column name="team_size" type="INTEGER"/>
+            
+            <column name="salary_range" type="VARCHAR(50)"/>
+            
+            <column name="display_order" type="INTEGER"/>
+
+            <!-- Audit fields (Base entity) -->
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Create resume_skills table -->
+        <createTable tableName="resume_skills">
+            <!-- Primary key -->
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Foreign key to resumes -->
+            <column name="resume_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Skill details -->
+            <column name="name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="category" type="VARCHAR(50)" defaultValue="OTHER"/>
+            
+            <column name="proficiency_level" type="VARCHAR(20)" defaultValue="INTERMEDIATE"/>
+            
+            <column name="years_of_experience" type="INTEGER"/>
+            
+            <column name="last_used_year" type="INTEGER"/>
+            
+            <column name="is_certified" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="certification_name" type="VARCHAR(200)"/>
+            
+            <column name="endorsements" type="INTEGER"/>
+            
+            <column name="self_assessed" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="priority_score" type="INTEGER"/>
+            
+            <column name="matched_from_text" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="display_order" type="INTEGER"/>
+
+            <!-- Audit fields (Base entity) -->
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Create resume_projects table -->
+        <createTable tableName="resume_projects">
+            <!-- Primary key -->
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Foreign key to resumes -->
+            <column name="resume_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Project details -->
+            <column name="name" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="description" type="TEXT"/>
+            
+            <column name="role" type="VARCHAR(100)"/>
+            
+            <column name="organization" type="VARCHAR(200)"/>
+            
+            <column name="project_type" type="VARCHAR(30)" defaultValue="PERSONAL"/>
+            
+            <column name="start_date" type="DATE"/>
+            
+            <column name="end_date" type="DATE"/>
+            
+            <column name="is_ongoing" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="technologies_used" type="TEXT"/>
+            
+            <column name="key_achievements" type="TEXT"/>
+            
+            <column name="challenges_faced" type="TEXT"/>
+            
+            <column name="project_url" type="VARCHAR(500)"/>
+            
+            <column name="github_url" type="VARCHAR(500)"/>
+            
+            <column name="demo_url" type="VARCHAR(500)"/>
+            
+            <column name="team_size" type="INTEGER"/>
+            
+            <column name="budget_range" type="VARCHAR(50)"/>
+            
+            <column name="client_name" type="VARCHAR(200)"/>
+            
+            <column name="industry" type="VARCHAR(100)"/>
+            
+            <column name="display_order" type="INTEGER"/>
+
+            <!-- Audit fields (Base entity) -->
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Create indexes for resumes table -->
+        <createIndex indexName="idx_resumes_user_id" tableName="resumes">
+            <column name="user_id"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resumes_created_at" tableName="resumes">
+            <column name="created_at"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resumes_status" tableName="resumes">
+            <column name="status"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resumes_is_primary" tableName="resumes">
+            <column name="is_primary"/>
+        </createIndex>
+
+        <!-- Create indexes for education table -->
+        <createIndex indexName="idx_resume_educations_resume_id" tableName="resume_educations">
+            <column name="resume_id"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resume_educations_degree_type" tableName="resume_educations">
+            <column name="degree_type"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resume_educations_end_date" tableName="resume_educations">
+            <column name="end_date"/>
+        </createIndex>
+
+        <!-- Create indexes for work experience table -->
+        <createIndex indexName="idx_resume_work_experiences_resume_id" tableName="resume_work_experiences">
+            <column name="resume_id"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resume_work_experiences_company" tableName="resume_work_experiences">
+            <column name="company_name"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resume_work_experiences_end_date" tableName="resume_work_experiences">
+            <column name="end_date"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resume_work_experiences_is_current" tableName="resume_work_experiences">
+            <column name="is_current"/>
+        </createIndex>
+
+        <!-- Create indexes for skills table -->
+        <createIndex indexName="idx_resume_skills_resume_id" tableName="resume_skills">
+            <column name="resume_id"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resume_skills_category" tableName="resume_skills">
+            <column name="category"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resume_skills_proficiency_level" tableName="resume_skills">
+            <column name="proficiency_level"/>
+        </createIndex>
+
+        <!-- Create indexes for projects table -->
+        <createIndex indexName="idx_resume_projects_resume_id" tableName="resume_projects">
+            <column name="resume_id"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resume_projects_project_type" tableName="resume_projects">
+            <column name="project_type"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_resume_projects_end_date" tableName="resume_projects">
+            <column name="end_date"/>
+        </createIndex>
+
+        <!-- Add foreign key constraints -->
+        <addForeignKeyConstraint
+            baseTableName="resumes"
+            baseColumnNames="user_id"
+            referencedTableName="users"
+            referencedColumnNames="id"
+            constraintName="fk_resumes_user"
+            onDelete="CASCADE"/>
+        
+        <addForeignKeyConstraint
+            baseTableName="resume_educations"
+            baseColumnNames="resume_id"
+            referencedTableName="resumes"
+            referencedColumnNames="id"
+            constraintName="fk_resume_educations_resume"
+            onDelete="CASCADE"/>
+        
+        <addForeignKeyConstraint
+            baseTableName="resume_work_experiences"
+            baseColumnNames="resume_id"
+            referencedTableName="resumes"
+            referencedColumnNames="id"
+            constraintName="fk_resume_work_experiences_resume"
+            onDelete="CASCADE"/>
+        
+        <addForeignKeyConstraint
+            baseTableName="resume_skills"
+            baseColumnNames="resume_id"
+            referencedTableName="resumes"
+            referencedColumnNames="id"
+            constraintName="fk_resume_skills_resume"
+            onDelete="CASCADE"/>
+        
+        <addForeignKeyConstraint
+            baseTableName="resume_projects"
+            baseColumnNames="resume_id"
+            referencedTableName="resumes"
+            referencedColumnNames="id"
+            constraintName="fk_resume_projects_resume"
+            onDelete="CASCADE"/>
+
+        <!-- Add check constraints for enums -->
+        <sql>
+            ALTER TABLE resumes ADD CONSTRAINT chk_resumes_status 
+            CHECK (status IN ('UPLOADED', 'PROCESSING', 'COMPLETED', 'FAILED'));
+        </sql>
+        
+        <sql>
+            ALTER TABLE resume_educations ADD CONSTRAINT chk_resume_educations_degree_type 
+            CHECK (degree_type IN ('HIGH_SCHOOL', 'DIPLOMA', 'ASSOCIATE', 'BACHELOR', 'MASTER', 'DOCTORATE', 'CERTIFICATE', 'PROFESSIONAL', 'OTHER'));
+        </sql>
+        
+        <sql>
+            ALTER TABLE resume_work_experiences ADD CONSTRAINT chk_resume_work_experiences_employment_type 
+            CHECK (employment_type IN ('FULL_TIME', 'PART_TIME', 'CONTRACT', 'FREELANCE', 'TEMPORARY', 'INTERNSHIP', 'VOLUNTEER', 'CONSULTANT', 'OTHER'));
+        </sql>
+        
+        <sql>
+            ALTER TABLE resume_skills ADD CONSTRAINT chk_resume_skills_category 
+            CHECK (category IN ('PROGRAMMING_LANGUAGE', 'FRAMEWORK', 'DATABASE', 'CLOUD', 'DEVOPS', 'MOBILE', 'WEB', 'DATA_SCIENCE', 'MACHINE_LEARNING', 'CYBERSECURITY', 'NETWORKING', 'OPERATING_SYSTEM', 'SOFTWARE', 'METHODOLOGY', 'SOFT_SKILL', 'LANGUAGE', 'OTHER'));
+        </sql>
+        
+        <sql>
+            ALTER TABLE resume_skills ADD CONSTRAINT chk_resume_skills_proficiency_level 
+            CHECK (proficiency_level IN ('BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT'));
+        </sql>
+        
+        <sql>
+            ALTER TABLE resume_projects ADD CONSTRAINT chk_resume_projects_project_type 
+            CHECK (project_type IN ('PERSONAL', 'ACADEMIC', 'PROFESSIONAL', 'OPEN_SOURCE', 'FREELANCE', 'STARTUP', 'RESEARCH', 'HACKATHON', 'CLIENT', 'OTHER'));
+        </sql>
+
+    </changeSet>
+
+</databaseChangeLog>

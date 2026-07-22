@@ -1,0 +1,307 @@
+server:
+  port: 8082
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+  http2:
+    enabled: true
+
+spring:
+  application:
+    name: interviai-backend
+  
+  profiles:
+    active: dev
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+          order_inserts: true
+          order_updates: true
+        cache:
+          use_second_level_cache: false
+  
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      connection-timeout: 20000
+      leak-detection-threshold: 60000
+  
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+  
+  cache:
+    type: simple
+    cache-names:
+      - users
+      - interviews
+      - analytics
+      - dashboards
+    caffeine:
+      spec: maximumSize=1000,expireAfterAccess=60m
+  
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+      enabled: true
+  
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${app.jwt.issuer:http://localhost:8080}
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:placeholder-google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:placeholder-google-client-secret}
+            scope:
+              - email
+              - profile
+          github:
+            client-id: ${GITHUB_CLIENT_ID:placeholder-github-client-id}
+            client-secret: ${GITHUB_CLIENT_SECRET:placeholder-github-client-secret}
+            scope:
+              - user:email
+              - read:user
+  
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.interviai.backend: INFO
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/interviai-backend.log
+    max-size: 10MB
+    max-history: 30
+
+app:
+  cors:
+    allowed-origins: 
+      - http://localhost:3000
+      - http://localhost:5173
+      - https://interviai.com
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+    allowed-headers:
+      - "*"
+    allow-credentials: true
+    max-age: 3600
+  
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    issuer: ${JWT_ISSUER:interviai-backend}
+    access-token-validity: 3600 # 1 hour in seconds
+    refresh-token-validity: 2592000 # 30 days in seconds
+  
+  file:
+    upload:
+      directory: ${FILE_UPLOAD_DIR:./uploads}
+      max-size: 10485760 # 10MB in bytes
+      allowed-extensions:
+        - pdf
+        - doc
+        - docx
+  
+  ai:
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      api-url: ${GEMINI_API_URL:https://generativelanguage.googleapis.com/v1/models}
+      model: ${GEMINI_MODEL:gemini-pro}
+      timeout: 30000 # 30 seconds
+      max-retries: 3
+      rate-limit: 60 # requests per minute
+  
+  frontend:
+    url: ${FRONTEND_URL:http://localhost:3000}
+  
+  security:
+    rate-limit:
+      enabled: true
+      requests-per-minute: 60
+      login-attempts-per-minute: 5
+      file-uploads-per-minute: 10
+    
+    password:
+      min-length: 8
+      max-length: 100
+      require-uppercase: true
+      require-lowercase: true
+      require-numbers: true
+      require-special-chars: true
+    
+    account:
+      max-login-attempts: 5
+      lockout-duration-minutes: 30
+      email-verification-required: true
+      password-reset-token-validity-hours: 24
+
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:}
+    base-url: https://generativelanguage.googleapis.com
+    model: gemini-1.5-flash-latest
+    timeout: 30000
+
+apify:
+  api-token: ${APIFY_API_TOKEN:}
+  actor-id: ${APIFY_ACTOR_ID:hKByXkMQaC5Qt9UMN}
+  base-url: ${APIFY_BASE_URL:https://api.apify.com/v2}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/interviai_dev
+    username: ${DB_USERNAME:interviai_user}
+    password: ${DB_PASSWORD:interviai_password}
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+logging:
+  level:
+    com.interviai.backend: DEBUG
+    org.springframework.security: DEBUG
+
+app:
+  cors:
+    allowed-origins: 
+      - http://localhost:3000
+      - http://localhost:5173
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+    show-sql: true
+  
+  h2:
+    console:
+      enabled: true
+  
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:your-email@gmail.com}
+    password: ${MAIL_PASSWORD:your-app-password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          ssl:
+            trust: smtp.gmail.com
+    test-connection: false
+
+logging:
+  level:
+    com.interviai.backend: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+logging:
+  level:
+    com.interviai.backend: INFO
+    org.springframework.security: WARN
+  file:
+    name: /var/log/interviai/backend.log
+
+app:
+  cors:
+    allowed-origins: 
+      - ${FRONTEND_URL:https://app.interviai.com}
+  
+  frontend:
+    url: ${FRONTEND_URL:https://app.interviai.com}
+  
+  security:
+    rate-limit:
+      requests-per-minute: 100
+
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:}
+    base-url: https://generativelanguage.googleapis.com
+    model: gemini-1.5-pro-latest
+    timeout: 30000
