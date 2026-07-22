@@ -56,6 +56,11 @@ export function TopNav() {
     icon: LayoutDashboard
   },
   {
+    name: 'Find Jobs',
+    path: '/jobs',
+    icon: Search
+  },
+  {
     name: 'Analytics',
     path: '/analytics',
     icon: LineChart

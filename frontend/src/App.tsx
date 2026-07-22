@@ -11,6 +11,7 @@ import { Register } from './pages/auth/Register';
 import { ForgotPassword } from './pages/auth/ForgotPassword';
 import { OAuthCallback } from './pages/auth/OAuthCallback';
 import { Dashboard } from './pages/Dashboard';
+import { JobSearchDashboard } from './pages/jobs/JobSearchDashboard';
 import { ResumeUpload } from './pages/ResumeUpload';
 import { CompanySelect } from './pages/interview/CompanySelect';
 import { RoleSelect } from './pages/interview/RoleSelect';
@@ -41,6 +42,7 @@ export function App() {
               {/* App Shell Routes */}
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/jobs" element={<JobSearchDashboard />} />
                 <Route path="/resume" element={<ResumeUpload />} />
                 <Route path="/interview/company" element={<CompanySelect />} />
                 <Route path="/interview/role" element={<RoleSelect />} />
