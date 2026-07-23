@@ -90,8 +90,12 @@ export function Room() {
   });
 
   // Trigger Automatic LLM Answer Validation when user finishes speaking
-  const triggerAutoValidation = useCallback(async (transcriptText: string) => {
-    if (!transcriptText || transcriptText.trim().length < 5 || !currentQuestion) return;
+  const triggerAutoValidation = useCallback(async (
+    transcriptText: string
+  ): Promise<AnswerValidationData | null> => {
+    if (!transcriptText || transcriptText.trim().length < 5 || !currentQuestion) {
+      return null;
+    }
     setValidatingAnswer(true);
 
     try {
@@ -105,17 +109,21 @@ export function Room() {
 
       if (res.data) {
         setValidationResult(res.data);
+        return res.data;
       }
+      return null;
     } catch (e) {
       console.warn('Realtime validation API error, using fallback:', e);
       // Fallback validation
-      setValidationResult({
+      const fallbackValidation: AnswerValidationData = {
         isRelevant: transcriptText.trim().length > 10,
         score: transcriptText.trim().length > 10 ? 8.5 : 2.0,
         confidence: 94,
         feedback: 'Good technical response. Remember to explicitly mention measurable metrics and trade-offs.',
         missingPoints: ['Performance optimization', 'Scalability decisions', 'Measurable impact']
-      });
+      };
+      setValidationResult(fallbackValidation);
+      return fallbackValidation;
     } finally {
       setValidatingAnswer(false);
     }
@@ -288,8 +296,13 @@ export function Room() {
 
     try {
       // 3. Submit Rule: Ensure answer validation is triggered if not done yet
-      if (!validationResult && !validatingAnswer) {
-        await triggerAutoValidation(answer);
+      let submittedValidation = validationResult;
+      if (!submittedValidation && !validatingAnswer) {
+        submittedValidation = await triggerAutoValidation(answer);
+      }
+
+      if (!submittedValidation) {
+        throw new Error('Answer validation did not return a score.');
       }
 
       await apiClient.post<any>(API_ENDPOINTS.INTERVIEW.SUBMIT_ANSWER, {
@@ -298,7 +311,12 @@ export function Room() {
         answerText: answer
       });
 
-      const currentScoreVal = (validationResult?.score || 8.5) * 10;
+      // Use the result returned by this validation request. Reading
+      // validationResult here used stale React state and always fell back to 8.5.
+      const rawScore = Number(submittedValidation.score);
+      const currentScoreVal = Number.isFinite(rawScore)
+        ? Math.max(0, Math.min(100, rawScore * 10))
+        : 0;
       const newScores = [...scoreHistory, currentScoreVal];
       setScoreHistory(newScores);
       const avgScore = Math.round(newScores.reduce((a, b) => a + b, 0) / newScores.length);
@@ -314,11 +332,11 @@ export function Room() {
         currentQuestionNumber: currentQIndex + 1,
         currentScore: avgScore,
         currentDifficulty: nextDiff,
-        weakSkillsDetected: validationResult?.missingPoints || [],
+        weakSkillsDetected: submittedValidation.missingPoints || [],
         lastEvaluation: {
           score: currentScoreVal,
-          feedback: validationResult?.feedback || 'Good response.',
-          expectedAnswer: validationResult?.idealAnswer || 'Ideal answer overview.'
+          feedback: submittedValidation.feedback || 'Good response.',
+          expectedAnswer: submittedValidation.idealAnswer || 'Ideal answer overview.'
         }
       });
 
