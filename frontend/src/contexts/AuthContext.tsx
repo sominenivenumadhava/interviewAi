@@ -110,7 +110,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // Check if access token is expired
         const tokenData = parseJWT(storedAccessToken);
-        const isExpired = tokenData.exp * 1000 <= Date.now();
+        const expiresAt = typeof tokenData.exp === 'number' ? tokenData.exp * 1000 : 0;
+        const isExpired = expiresAt <= Date.now();
 
         if (isExpired) {
           // Try to refresh the token
@@ -126,7 +127,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setTokens({
             accessToken: storedAccessToken,
             refreshToken: storedRefreshToken,
-            expiresAt: tokenData.exp * 1000,
+            expiresAt,
           });
         }
 
@@ -242,10 +243,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
       }
 
+      const refreshedTokenData = parseJWT(response.data.accessToken);
+      if (typeof refreshedTokenData.exp !== 'number') {
+        clearAuthData();
+        setUser(null);
+        setTokens(null);
+        return false;
+      }
+
       const newTokens: AuthTokens = {
         accessToken: response.data.accessToken,
-        refreshToken: response.data.refreshToken,
-        expiresAt: parseJWT(response.data.accessToken).exp * 1000,
+        refreshToken: response.data.refreshToken || refreshTokenValue,
+        expiresAt: refreshedTokenData.exp * 1000,
       };
 
       // Update stored tokens
@@ -257,6 +266,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return true;
     } catch (error) {
       console.error('Token refresh error:', error);
+      clearAuthData();
+      setUser(null);
+      setTokens(null);
       return false;
     }
   };

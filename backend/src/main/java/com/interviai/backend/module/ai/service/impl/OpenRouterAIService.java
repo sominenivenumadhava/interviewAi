@@ -1,8 +1,8 @@
 package com.interviai.backend.module.ai.service.impl;
 
-import com.interviai.backend.module.ai.config.GeminiConfig;
-import com.interviai.backend.module.ai.dto.GeminiRequest;
-import com.interviai.backend.module.ai.dto.GeminiResponse;
+import com.interviai.backend.module.ai.config.OpenRouterConfig;
+import com.interviai.backend.module.ai.dto.OpenRouterRequest;
+import com.interviai.backend.module.ai.dto.OpenRouterResponse;
 import com.interviai.backend.module.ai.exception.AIServiceException;
 import com.interviai.backend.module.ai.service.AIService;
 import org.slf4j.Logger;
@@ -17,40 +17,44 @@ import reactor.util.retry.Retry;
 import java.time.Duration;
 
 @Service
-public class GeminiAIService implements AIService {
-    
-    private static final Logger log = LoggerFactory.getLogger(GeminiAIService.class);
-    
+public class OpenRouterAIService implements AIService {
+
+    private static final Logger log = LoggerFactory.getLogger(OpenRouterAIService.class);
+
     @Autowired
-    private WebClient geminiWebClient;
-    
+    private WebClient openRouterWebClient;
+
     @Autowired
-    private GeminiConfig geminiConfig;
-    
+    private OpenRouterConfig openRouterConfig;
+
     @Override
     public Mono<String> generateContent(String prompt) {
-        return generateContent(prompt, GeminiRequest.GenerationConfig.defaultConfig());
+        return generateContent(prompt, OpenRouterRequest.GenerationConfig.defaultConfig());
     }
-    
+
     @Override
-    public Mono<String> generateContent(String prompt, GeminiRequest.GenerationConfig config) {
-        GeminiRequest request = new GeminiRequest(prompt, config);
+    public Mono<String> generateContent(String prompt, OpenRouterRequest.GenerationConfig config) {
+        OpenRouterRequest request = new OpenRouterRequest(
+                openRouterConfig.getDefaultModel(),
+                prompt,
+                config
+        );
         return generateRawContent(request)
-                .map(GeminiResponse::getFirstText)
-                .switchIfEmpty(Mono.error(new AIServiceException("No response generated")));
+                .flatMap(response -> Mono.justOrEmpty(response.getFirstText()))
+                .filter(text -> text != null && !text.isBlank())
+                .switchIfEmpty(Mono.error(new AIServiceException("OpenRouter returned no content")));
     }
-    
+
     @Override
     public Mono<String> generateStructuredContent(String prompt, String systemInstruction) {
         String fullPrompt = systemInstruction + "\n\n" + prompt;
-        GeminiRequest.GenerationConfig config = GeminiRequest.GenerationConfig.preciseConfig();
-        return generateContent(fullPrompt, config);
+        return generateContent(fullPrompt, OpenRouterRequest.GenerationConfig.preciseConfig());
     }
-    
+
     @Override
     public Mono<String> generateInterviewQuestions(String resumeText, String role, String difficulty, int count) {
         String systemInstruction = String.format(
-            "You are an expert technical interviewer. Based on the following resume and requirements, " +
+            "You are an expert interviewer. Based on the supplied candidate and interview context, " +
             "generate %d %s-level interview questions for a %s position.\n\n" +
             "Return the response in the following JSON format:\n" +
             "{\n" +
@@ -66,18 +70,22 @@ public class GeminiAIService implements AIService {
             "    }\n" +
             "  ]\n" +
             "}\n\n" +
-            "Ensure questions are relevant to the candidate's experience level and the role requirements.",
+            "Ground every question in the supplied role, company, interview round, focus areas, preferred " +
+            "language, job description, or resume details. Respect the requested interview round. " +
+            "Do not substitute generic, standard interview questions when specific context is available. " +
+            "Return raw valid JSON only, without Markdown code fences or explanatory text.",
             count, difficulty, role, difficulty
         );
-        
-        String prompt = "Resume:\n" + resumeText + "\n\nGenerate interview questions now.";
-        
+
+        String prompt = "Candidate and interview context:\n" + resumeText +
+            "\n\nGenerate the personalized interview questions now.";
+
         return generateStructuredContent(prompt, systemInstruction);
     }
-    
+
     @Override
     public Mono<String> evaluateAnswer(String question, String answer, String expectedCriteria) {
-        String systemInstruction = 
+        String systemInstruction =
             "You are an expert interview evaluator. Evaluate the following answer based on the question and criteria.\n\n" +
             "Return the response in the following JSON format:\n" +
             "{\n" +
@@ -89,93 +97,75 @@ public class GeminiAIService implements AIService {
             "  \"suggestedAnswer\": \"An example of a strong answer\"\n" +
             "}\n\n" +
             "Be constructive and specific in your feedback.";
-        
+
         String prompt = String.format(
             "Question: %s\n\nAnswer: %s\n\nEvaluation Criteria: %s\n\nEvaluate the answer now.",
             question, answer, expectedCriteria
         );
-        
+
         return generateStructuredContent(prompt, systemInstruction);
     }
-    
+
     @Override
     public Mono<String> extractSkills(String resumeText) {
-        String systemInstruction = 
-            "You are an expert resume analyzer. Extract all technical and soft skills from the resume.\n\n" +
+        String systemInstruction =
+            "You are a resume analyzer. Extract all technical and soft skills from the resume.\n\n" +
             "Return the response in the following JSON format:\n" +
             "{\n" +
-            "  \"technicalSkills\": [\n" +
-            "    {\n" +
-            "      \"category\": \"Programming Languages/Frameworks/Tools/Databases\",\n" +
-            "      \"skills\": [\"skill1\", \"skill2\"],\n" +
-            "      \"proficiencyLevel\": \"EXPERT/ADVANCED/INTERMEDIATE/BEGINNER\"\n" +
-            "    }\n" +
-            "  ],\n" +
+            "  \"technicalSkills\": [{\"name\": \"skill\", \"level\": \"BEGINNER/INTERMEDIATE/ADVANCED/EXPERT\"}],\n" +
             "  \"softSkills\": [\"skill1\", \"skill2\"],\n" +
-            "  \"domainKnowledge\": [\"domain1\", \"domain2\"],\n" +
+            "  \"tools\": [\"tool1\", \"tool2\"],\n" +
             "  \"certifications\": [\"cert1\", \"cert2\"]\n" +
             "}\n\n" +
-            "Be comprehensive and categorize skills appropriately.";
-        
+            "Infer skill levels from experience and context. Categorize skills appropriately.";
+
         String prompt = "Resume:\n" + resumeText + "\n\nExtract all skills now.";
-        
         return generateStructuredContent(prompt, systemInstruction);
     }
-    
+
     @Override
     public Mono<String> analyzeSkillGap(String userSkills, String targetRole) {
-        String systemInstruction = 
+        String systemInstruction =
             "You are a career advisor. Analyze the skill gap between current skills and target role requirements.\n\n" +
             "Return the response in the following JSON format:\n" +
             "{\n" +
             "  \"matchPercentage\": 0-100,\n" +
             "  \"matchedSkills\": [\"skill1\", \"skill2\"],\n" +
-            "  \"missingSkills\": [\n" +
-            "    {\n" +
-            "      \"skill\": \"skill name\",\n" +
-            "      \"importance\": \"CRITICAL/HIGH/MEDIUM/LOW\",\n" +
-            "      \"learningPath\": \"Suggested learning resources\"\n" +
-            "    }\n" +
-            "  ],\n" +
+            "  \"missingSkills\": [{\"skill\": \"skill name\", \"importance\": \"CRITICAL/HIGH/MEDIUM/LOW\", " +
+            "\"learningPath\": \"Suggested learning resources\"}],\n" +
             "  \"recommendations\": [\"recommendation1\", \"recommendation2\"],\n" +
             "  \"estimatedTimeToCloseGap\": \"X months\",\n" +
-            "  \"roadmap\": [\n" +
-            "    {\n" +
-            "      \"phase\": 1,\n" +
-            "      \"duration\": \"X weeks\",\n" +
-            "      \"skills\": [\"skill1\", \"skill2\"],\n" +
-            "      \"resources\": [\"resource1\", \"resource2\"]\n" +
-            "    }\n" +
-            "  ]\n" +
+            "  \"roadmap\": [{\"phase\": 1, \"duration\": \"X weeks\", \"skills\": [\"skill1\"], " +
+            "\"resources\": [\"resource1\"]}]\n" +
             "}\n\n" +
             "Provide actionable and realistic recommendations.";
-        
+
         String prompt = String.format(
             "Current Skills: %s\n\nTarget Role: %s\n\nAnalyze skill gap now.",
             userSkills, targetRole
         );
-        
+
         return generateStructuredContent(prompt, systemInstruction);
     }
-    
+
     @Override
-    public Mono<GeminiResponse> generateRawContent(GeminiRequest request) {
-        String endpoint = String.format("/v1beta/models/%s:generateContent", geminiConfig.getDefaultModel());
-        
-        return geminiWebClient.post()
-                .uri(endpoint)
+    public Mono<OpenRouterResponse> generateRawContent(OpenRouterRequest request) {
+        return openRouterWebClient.post()
+                .uri("/chat/completions")
                 .bodyValue(request)
                 .retrieve()
-                .bodyToMono(GeminiResponse.class)
-                .doOnError(WebClientResponseException.class, e -> {
-                    log.error("Gemini API error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
-                })
+                .bodyToMono(OpenRouterResponse.class)
+                .doOnError(WebClientResponseException.class, e ->
+                    log.error("OpenRouter API error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString())
+                )
                 .retryWhen(Retry.backoff(3, Duration.ofSeconds(1))
                         .filter(throwable -> throwable instanceof WebClientResponseException &&
                                 ((WebClientResponseException) throwable).getStatusCode().is5xxServerError()))
-                .onErrorMap(WebClientResponseException.class, e -> 
-                    new AIServiceException("Failed to generate content: " + e.getMessage(), e))
-                .onErrorMap(Exception.class, e -> 
-                    new AIServiceException("Unexpected error in AI service", e));
+                .onErrorMap(WebClientResponseException.class, e ->
+                    new AIServiceException("OpenRouter request failed: " + e.getMessage(), e))
+                .onErrorMap(
+                    e -> !(e instanceof AIServiceException),
+                    e -> new AIServiceException("Unexpected error in OpenRouter service", e)
+                );
     }
 }

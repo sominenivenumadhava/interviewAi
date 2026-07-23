@@ -456,7 +456,7 @@ Administrative functions and system management.
 Centralized AI integration and prompt management.
 
 #### Responsibilities
-- Gemini API integration
+- Gemini Flash-Lite integration through OpenRouter
 - Prompt template management
 - AI response validation
 - Retry and fallback logic
@@ -464,12 +464,12 @@ Centralized AI integration and prompt management.
 #### Components
 
 **Services**
-- `GeminiService`: Gemini API client
+- `OpenRouterAIService`: OpenRouter chat-completions client
 - `PromptService`: Prompt generation
 - `AIResponseValidator`: Response validation
 
 **Configuration**
-- `GeminiConfiguration`: API settings
+- `OpenRouterConfig`: API, model, and application attribution settings
 
 ### 12. Common Module
 
@@ -1098,9 +1098,9 @@ Provide detailed feedback and improvement suggestions.
 
 ```java
 @Service
-public class GeminiAIService {
+public class OpenRouterAIService {
     
-    private final GeminiClient geminiClient;
+    private final WebClient openRouterWebClient;
     private final PromptTemplateService promptService;
     private final AIResponseValidator validator;
     private final RetryTemplate retryTemplate;
@@ -1111,7 +1111,7 @@ public class GeminiAIService {
         String prompt = promptService.buildQuestionPrompt(request);
         
         return retryTemplate.execute(context -> {
-            GeminiResponse response = geminiClient.generate(prompt);
+            OpenRouterResponse response = callChatCompletions(prompt);
             validator.validate(response);
             return parseQuestionResponse(response);
         });
@@ -1536,7 +1536,7 @@ public class InterviewFacade {
 - Users can manage their resumes
 
 ### Phase 4: AI Integration (Week 5-6)
-**Goal**: Gemini API integration
+**Goal**: Gemini Flash-Lite integration through OpenRouter
 
 **Tasks**:
 - [ ] Gemini client setup

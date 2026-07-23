@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -17,7 +17,8 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useInterviewSession } from '../../contexts/InterviewSessionContext';
-import apiClient, { API_ENDPOINTS } from '../../lib/apiClient';
+import { useRequireAuth } from '../../contexts/AuthContext';
+import apiClient, { API_ENDPOINTS, ApiError } from '../../lib/apiClient';
 import { useDeepgramLive } from '../../hooks/useDeepgramLive';
 import { AnswerValidationCard, AnswerValidationData } from '../../components/interview/AnswerValidationCard';
 
@@ -33,8 +34,11 @@ interface LiveQuestion {
   isLastQuestion: boolean;
 }
 
+const MAX_ANSWER_LENGTH = 50_000;
+
 export function Room() {
   const navigate = useNavigate();
+  const auth = useRequireAuth();
   const {
     selectedCompany,
     selectedRole,
@@ -45,6 +49,7 @@ export function Room() {
   } = useInterviewSession();
 
   const [loading, setLoading] = useState(true);
+  const [sessionInitError, setSessionInitError] = useState<string | null>(null);
   const [evaluating, setEvaluating] = useState(false);
   const [validatingAnswer, setValidatingAnswer] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
@@ -63,11 +68,12 @@ export function Room() {
   const [validationResult, setValidationResult] = useState<AnswerValidationData | null>(null);
   const [scoreHistory, setScoreHistory] = useState<number[]>([]);
   const [currentDifficulty, setCurrentDifficulty] = useState<string>(selectedConfig.difficulty);
+  const submitInFlightRef = useRef(false);
 
   // Deepgram Live Speech-to-Text Integration
   const handleTranscriptUpdate = useCallback((newTranscript: string) => {
     if (newTranscript) {
-      setAnswer(newTranscript);
+      setAnswer(newTranscript.slice(0, MAX_ANSWER_LENGTH));
       setValidationError(null);
     }
   }, []);
@@ -132,8 +138,13 @@ export function Room() {
 
   // Initialize Interview Session with Backend
   useEffect(() => {
+    if (auth.isLoading || !auth.isAuthenticated) {
+      return;
+    }
+
     const initSession = async () => {
       setLoading(true);
+      setSessionInitError(null);
       try {
         const createRes = await apiClient.post<any>(API_ENDPOINTS.INTERVIEW.CREATE, {
           company: selectedCompany,
@@ -141,7 +152,15 @@ export function Room() {
           interviewType: selectedConfig.interviewType,
           difficultyLevel: selectedConfig.difficulty,
           durationMinutes: parseInt(selectedConfig.duration || '45'),
-          numberOfQuestions: selectedConfig.numberOfQuestions || 5
+          numberOfQuestions: selectedConfig.numberOfQuestions || 5,
+          includeCodingQuestions: selectedConfig.interviewType === 'CODING',
+          focusAreas: [
+            selectedConfig.focusAreas,
+            selectedConfig.language ? `Preferred language: ${selectedConfig.language}` : ''
+          ].filter(Boolean).join('; ')
+        }, {
+          timeout: 60000,
+          retry: false
         });
 
         const createdSessionId = createRes.data?.sessionId || `sess-${Date.now()}`;
@@ -192,43 +211,20 @@ export function Room() {
           });
         }
       } catch (err) {
-        console.warn('Backend session init fallback active:', err);
-        const fallbackSessionId = `sess-${Date.now()}`;
-        setSessionId(fallbackSessionId);
-        startSessionState({
-          sessionId: fallbackSessionId,
-          company: selectedCompany,
-          role: selectedRole,
-          interviewType: selectedConfig.interviewType,
-          difficulty: selectedConfig.difficulty,
-          durationMinutes: parseInt(selectedConfig.duration || '45'),
-          totalQuestions: selectedConfig.numberOfQuestions || 5,
-          currentQuestionNumber: 1,
-          currentScore: 0,
-          currentDifficulty: selectedConfig.difficulty,
-          timeRemainingSeconds: parseInt(selectedConfig.duration || '45') * 60,
-          startedAt: new Date().toISOString(),
-          status: 'in_progress',
-          weakSkillsDetected: [],
-          lastEvaluation: null
-        });
-        setCurrentQuestion({
-          questionNumber: 1,
-          question: `Welcome to your ${selectedCompany} ${selectedConfig.interviewType} interview! Could you share a high-impact project you delivered, focusing on key decisions and technical challenges?`,
-          category: selectedConfig.interviewType,
-          difficulty: selectedConfig.difficulty,
-          expectedMinutes: 5,
-          evaluationCriteria: ['Problem context', 'Technical approach', 'Measurable impact'],
-          interviewPhase: 'WARMUP',
-          isLastQuestion: false
-        });
+        console.warn('Unable to initialize interview session:', err);
+        const authenticationFailed = err instanceof ApiError && err.status === 401;
+        setSessionInitError(
+          authenticationFailed
+            ? 'Your session has expired. Please log in again.'
+            : 'Unable to start the personalized interview. Please return to the dashboard and try again.'
+        );
       } finally {
         setLoading(false);
       }
     };
 
     initSession();
-  }, []);
+  }, [auth.isLoading, auth.isAuthenticated]);
 
   // Text Streaming Effect for Question Presentation
   useEffect(() => {
@@ -267,6 +263,11 @@ export function Room() {
 
   // Submit Answer & Move to Next Question
   const handleSubmitAnswer = async () => {
+    // React state updates are asynchronous, so a rapid second click can arrive
+    // before the disabled state renders. Keep an immediate lock as well.
+    if (submitInFlightRef.current) return;
+    submitInFlightRef.current = true;
+
     // 1. Submit Rule: If recording is active, stop recording first
     if (isRecording) {
       stopRecording();
@@ -275,10 +276,14 @@ export function Room() {
     // 2. Submit Rule: If transcript is empty, show error message
     if (!answer.trim()) {
       setValidationError('Please answer the question before proceeding.');
+      submitInFlightRef.current = false;
       return;
     }
 
-    if (evaluating) return;
+    if (evaluating) {
+      submitInFlightRef.current = false;
+      return;
+    }
     setEvaluating(true);
 
     try {
@@ -287,10 +292,10 @@ export function Room() {
         await triggerAutoValidation(answer);
       }
 
-      const res = await apiClient.post<any>(API_ENDPOINTS.INTERVIEW.SUBMIT_ANSWER, {
+      await apiClient.post<any>(API_ENDPOINTS.INTERVIEW.SUBMIT_ANSWER, {
         sessionId,
         questionOrder: currentQIndex,
-        userAnswer: answer
+        answerText: answer
       });
 
       const currentScoreVal = (validationResult?.score || 8.5) * 10;
@@ -324,6 +329,15 @@ export function Room() {
         return;
       }
 
+      // Fetch the next generated question after the current answer has been saved.
+      const nextQuestionRes = await apiClient.get<any>(
+        API_ENDPOINTS.INTERVIEW.NEXT_QUESTION(sessionId)
+      );
+      const nextQ = nextQuestionRes.data;
+      if (!nextQ?.questionText && !nextQ?.question) {
+        throw new Error('The backend did not return the next generated question.');
+      }
+
       // Prepare Next Question
       setCurrentQIndex((prev) => prev + 1);
       setAnswer('');
@@ -331,66 +345,50 @@ export function Room() {
       setValidationError(null);
       setShowHints(false);
 
-      if (res.data && res.data.nextQuestion) {
-        const nextQ = res.data.nextQuestion;
-        setCurrentQuestion({
-          questionNumber: currentQIndex + 1,
-          question: nextQ.questionText || nextQ.question,
-          category: nextQ.category || selectedConfig.interviewType,
-          difficulty: nextDiff,
-          expectedMinutes: 5,
-          evaluationCriteria: nextQ.evaluationCriteria || ['Deep technical breakdown'],
-          transitionPhrase: nextQ.transitionPhrase || 'Nice work! Moving on.',
-          interviewPhase: currentQIndex + 1 === totalQ ? 'CLOSING' : 'CORE',
-          isLastQuestion: currentQIndex + 1 === totalQ
-        });
-      } else {
-        setCurrentQuestion({
-          questionNumber: currentQIndex + 1,
-          question: `Follow-up: That makes sense regarding your use of ${selectedConfig.language || 'technology'}. How would you scale this architecture to handle 5 million active concurrent users while maintaining 99.99% availability at ${selectedCompany}?`,
-          category: selectedConfig.interviewType,
-          difficulty: nextDiff,
-          expectedMinutes: 5,
-          evaluationCriteria: ['Caching strategy', 'Database sharding', 'Load balancing'],
-          transitionPhrase: "Good answer. Let's dig deeper into scalability.",
-          interviewPhase: currentQIndex + 1 === totalQ ? 'CLOSING' : 'DEEP_DIVE',
-          isLastQuestion: currentQIndex + 1 === totalQ
-        });
-      }
-    } catch (err) {
-      console.warn('Answer submit fallback handled:', err);
-      const totalQ = selectedConfig.numberOfQuestions || 5;
-      if (currentQIndex >= totalQ) {
-        endSessionState();
-        navigate('/evaluation');
-        return;
-      }
-
-      setCurrentQIndex((prev) => prev + 1);
-      setAnswer('');
-      setValidationResult(null);
-      setValidationError(null);
-      setShowHints(false);
       setCurrentQuestion({
         questionNumber: currentQIndex + 1,
-        question: `How do you approach monitoring, observability, and automated alerting for this system in production?`,
-        category: selectedConfig.interviewType,
-        difficulty: currentDifficulty,
-        expectedMinutes: 5,
-        evaluationCriteria: ['Metrics collection', 'Log aggregation', 'Alert thresholds'],
-        interviewPhase: 'CORE',
+        question: nextQ.questionText || nextQ.question,
+        category: nextQ.category || selectedConfig.interviewType,
+        difficulty: nextQ.difficultyLevel || nextDiff,
+        expectedMinutes: nextQ.expectedTimeMinutes || 5,
+        evaluationCriteria: nextQ.evaluationCriteria || ['Deep technical breakdown'],
+        transitionPhrase: nextQ.transitionPhrase || 'Nice work! Moving on.',
+        interviewPhase: currentQIndex + 1 === totalQ ? 'CLOSING' : 'CORE',
         isLastQuestion: currentQIndex + 1 === totalQ
       });
+    } catch (err) {
+      console.warn('Unable to submit the answer or load the generated question:', err);
+      setValidationError(
+        'Unable to load the next personalized question. Please try submitting again.'
+      );
     } finally {
       setEvaluating(false);
+      submitInFlightRef.current = false;
     }
   };
 
-  if (loading) {
+  if (auth.isLoading || loading) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-ink-950 text-white space-y-4">
         <Loader2 className="h-10 w-10 animate-spin text-brand-500" />
         <p className="text-sm text-ink-400">Initializing {selectedCompany} Virtual Interviewer & Deepgram Live STT Engine...</p>
+      </div>
+    );
+  }
+
+  if (!auth.isAuthenticated) {
+    return null;
+  }
+
+  if (sessionInitError) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-ink-950 px-6 text-center text-white">
+        <AlertTriangle className="mb-4 h-10 w-10 text-warning" />
+        <h1 className="text-xl font-bold">Interview could not start</h1>
+        <p className="mt-2 max-w-md text-sm text-ink-300">{sessionInitError}</p>
+        <Button className="mt-6" onClick={() => navigate('/dashboard')}>
+          Return to dashboard
+        </Button>
       </div>
     );
   }
@@ -620,8 +618,14 @@ export function Room() {
                     </span>
                   )}
                 </label>
-                <span className="text-[10px] text-ink-500">
-                  {answer.length} characters (Editable)
+                <span className={`text-[10px] ${
+                  answer.length >= MAX_ANSWER_LENGTH
+                    ? 'text-red-400'
+                    : answer.length >= MAX_ANSWER_LENGTH * 0.9
+                      ? 'text-amber-400'
+                      : 'text-ink-500'
+                }`}>
+                  {answer.length.toLocaleString()} / {MAX_ANSWER_LENGTH.toLocaleString()} characters
                 </span>
               </div>
               <textarea
@@ -630,6 +634,7 @@ export function Room() {
                   setAnswer(e.target.value);
                   setValidationError(null);
                 }}
+                maxLength={MAX_ANSWER_LENGTH}
                 placeholder="Click 'Start Speaking' to stream speech live via Deepgram, or type your answer here..."
                 disabled={evaluating}
                 className={`h-40 w-full resize-none rounded-xl border p-4 text-sm text-ink-100 placeholder:text-ink-600 focus:outline-none focus:ring-1 transition-all ${

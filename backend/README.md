@@ -147,9 +147,10 @@ app:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     issuer: interviai-backend
   
-  ai:
-    gemini:
-      api-key: ${GEMINI_API_KEY:your-gemini-api-key}
+openrouter:
+  api:
+    key: ${OPENROUTER_API_KEY:sk-or-v1-your-openrouter-key}
+    model: ${OPENROUTER_MODEL:google/gemini-2.5-flash-lite}
 
 logging:
   level:
@@ -518,7 +519,8 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 DB_USERNAME=your_db_user
 DB_PASSWORD=your_db_password  
 JWT_SECRET=your-256-bit-secret-key
-GEMINI_API_KEY=your-gemini-api-key
+OPENROUTER_API_KEY=sk-or-v1-your-openrouter-key
+OPENROUTER_MODEL=google/gemini-2.5-flash-lite
 
 # Optional environment variables
 SPRING_PROFILES_ACTIVE=prod

@@ -150,15 +150,6 @@ app:
         - doc
         - docx
   
-  ai:
-    gemini:
-      api-key: ${GEMINI_API_KEY:}
-      api-url: ${GEMINI_API_URL:https://generativelanguage.googleapis.com/v1/models}
-      model: ${GEMINI_MODEL:gemini-pro}
-      timeout: 30000 # 30 seconds
-      max-retries: 3
-      rate-limit: 60 # requests per minute
-  
   frontend:
     url: ${FRONTEND_URL:http://localhost:3000}
   
@@ -183,11 +174,13 @@ app:
       email-verification-required: true
       password-reset-token-validity-hours: 24
 
-gemini:
+openrouter:
   api:
-    key: ${GEMINI_API_KEY:}
-    base-url: https://generativelanguage.googleapis.com
-    model: gemini-1.5-flash-latest
+    key: ${OPENROUTER_API_KEY:}
+    base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+    model: ${OPENROUTER_MODEL:google/gemini-2.5-flash-lite}
+    site-url: ${OPENROUTER_SITE_URL:http://localhost:5173}
+    app-name: ${OPENROUTER_APP_NAME:InterviAI}
     timeout: 30000
 
 apify:
@@ -299,9 +292,11 @@ app:
     rate-limit:
       requests-per-minute: 100
 
-gemini:
+openrouter:
   api:
-    key: ${GEMINI_API_KEY:}
-    base-url: https://generativelanguage.googleapis.com
-    model: gemini-1.5-pro-latest
+    key: ${OPENROUTER_API_KEY:}
+    base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+    model: ${OPENROUTER_MODEL:google/gemini-2.5-flash-lite}
+    site-url: ${OPENROUTER_SITE_URL:https://app.interviai.com}
+    app-name: ${OPENROUTER_APP_NAME:InterviAI}
     timeout: 30000

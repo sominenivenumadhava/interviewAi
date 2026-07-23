@@ -32,6 +32,7 @@ export default {content: [
           700: '#334155',
           800: '#1e293b',
           900: '#0f172a',
+          950: '#020617',
         },
         success: '#22c55e',
         warning: '#f59e0b',

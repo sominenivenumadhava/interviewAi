@@ -66,11 +66,15 @@ public interface AuthMapper {
     /**
      * Create refresh token response.
      */
-    default AuthenticationResponse createRefreshResponse(String accessToken, Long expiresIn) {
+    default AuthenticationResponse createRefreshResponse(
+            String accessToken,
+            String refreshToken,
+            Long expiresIn) {
         LocalDateTime now = LocalDateTime.now();
         
         return AuthenticationResponse.builder()
                 .accessToken(accessToken)
+                .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .expiresIn(expiresIn)
                 .issuedAt(now)

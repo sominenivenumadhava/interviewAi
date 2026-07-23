@@ -1,7 +1,7 @@
 package com.interviai.backend.module.ai.service;
 
-import com.interviai.backend.module.ai.dto.GeminiRequest;
-import com.interviai.backend.module.ai.dto.GeminiResponse;
+import com.interviai.backend.module.ai.dto.OpenRouterRequest;
+import com.interviai.backend.module.ai.dto.OpenRouterResponse;
 import reactor.core.publisher.Mono;
 
 public interface AIService {
@@ -19,7 +19,7 @@ public interface AIService {
      * @param config Generation configuration
      * @return AI generated response
      */
-    Mono<String> generateContent(String prompt, GeminiRequest.GenerationConfig config);
+    Mono<String> generateContent(String prompt, OpenRouterRequest.GenerationConfig config);
     
     /**
      * Generate structured content with a specific format
@@ -64,9 +64,9 @@ public interface AIService {
     Mono<String> analyzeSkillGap(String userSkills, String targetRole);
     
     /**
-     * Get raw Gemini API response
-     * @param request Custom Gemini request
-     * @return Raw Gemini response
+     * Get the raw OpenRouter chat-completion response
+     * @param request Custom OpenRouter request
+     * @return Raw OpenRouter response
      */
-    Mono<GeminiResponse> generateRawContent(GeminiRequest request);
+    Mono<OpenRouterResponse> generateRawContent(OpenRouterRequest request);
 }

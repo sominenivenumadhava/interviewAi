@@ -76,7 +76,7 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
                 Map.class
             );
             
-            int numberOfQuestions = (int) config.getOrDefault("numberOfQuestions", 10);
+            int numberOfQuestions = ((Number) config.getOrDefault("numberOfQuestions", 10)).intValue();
             
             // Prepare resume content
             String resumeContent = "";
@@ -84,18 +84,23 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
                 Resume resume = interview.getResume();
                 resumeContent = buildResumeContent(resume);
             }
+
+            String interviewContext = buildInterviewContext(interview, config, resumeContent);
             
             // Generate questions using AI
             String questionsJson = aiService.generateInterviewQuestions(
-                resumeContent,
+                interviewContext,
                 interview.getRole(),
                 interview.getDifficultyLevel().name(),
                 numberOfQuestions
             ).block(); // Blocking for simplicity in this implementation
             
             // Parse the generated questions
-            Map<String, Object> generatedData = objectMapper.readValue(questionsJson, Map.class);
+            Map<String, Object> generatedData = objectMapper.readValue(extractJsonObject(questionsJson), Map.class);
             List<Map<String, Object>> questionsList = (List<Map<String, Object>>) generatedData.get("questions");
+            if (questionsList == null || questionsList.isEmpty()) {
+                throw new BusinessException("AI returned no interview questions");
+            }
             
             List<InterviewQuestion> questions = new ArrayList<>();
             for (int i = 0; i < questionsList.size(); i++) {
@@ -341,6 +346,55 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
         }
         
         return content.toString();
+    }
+
+    private String buildInterviewContext(
+            Interview interview,
+            Map<String, Object> config,
+            String resumeContent
+    ) {
+        StringBuilder context = new StringBuilder();
+        context.append("Target role: ").append(interview.getRole()).append("\n");
+        context.append("Target company: ")
+                .append(hasText(interview.getCompany()) ? interview.getCompany() : "Not specified")
+                .append("\n");
+        context.append("Interview round: ").append(interview.getInterviewType().name()).append("\n");
+        context.append("Difficulty: ").append(interview.getDifficultyLevel().name()).append("\n");
+
+        appendContextValue(context, "Job description", interview.getJobDescription());
+        appendContextValue(context, "Focus areas", config.get("focusAreas"));
+        appendContextValue(context, "Custom instructions", config.get("customInstructions"));
+
+        if (hasText(resumeContent)) {
+            context.append("\nCandidate resume:\n").append(resumeContent.trim()).append("\n");
+        } else {
+            context.append("\nCandidate resume: Not provided\n");
+        }
+
+        return context.toString();
+    }
+
+    private void appendContextValue(StringBuilder context, String label, Object value) {
+        if (value != null && hasText(value.toString())) {
+            context.append(label).append(": ").append(value.toString().trim()).append("\n");
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    String extractJsonObject(String response) {
+        if (!hasText(response)) {
+            throw new BusinessException("AI returned an empty response");
+        }
+
+        int start = response.indexOf('{');
+        int end = response.lastIndexOf('}');
+        if (start < 0 || end < start) {
+            throw new BusinessException("AI response did not contain valid JSON");
+        }
+        return response.substring(start, end + 1);
     }
     
     private InterviewQuestion createQuestionFromData(Interview interview, Map<String, Object> data, int order) {

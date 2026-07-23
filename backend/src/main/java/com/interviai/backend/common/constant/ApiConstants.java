@@ -97,7 +97,7 @@ public final class ApiConstants {
     public static final int MAX_INTERVIEW_DURATION_MINUTES = 180;
     public static final int MIN_QUESTIONS_PER_INTERVIEW = 5;
     public static final int MAX_QUESTIONS_PER_INTERVIEW = 50;
-    public static final int MAX_ANSWER_LENGTH = 5000;
+    public static final int MAX_ANSWER_LENGTH = 50000;
 
     // AI service constraints
     public static final int MAX_AI_PROMPT_LENGTH = 10000;

@@ -73,8 +73,14 @@ createdb interviai_dev
 export DB_USERNAME=your_db_user
 export DB_PASSWORD=your_db_password
 export JWT_SECRET=your-256-bit-secret-key
-export GEMINI_API_KEY=your-gemini-api-key
+export OPENROUTER_API_KEY=sk-or-v1-your-openrouter-key
+# Optional; this cost-focused Gemini Flash-Lite model is already the default:
+export OPENROUTER_MODEL=google/gemini-2.5-flash-lite
 ```
+
+Create the API key in your OpenRouter dashboard. All AI features use OpenRouter's
+OpenAI-compatible chat-completions endpoint; the backend no longer calls Google's
+Gemini API directly.
 
 3. **Run Backend**
 ```bash

@@ -1,5 +1,6 @@
 package com.interviai.backend.module.interview.dto.request;
 
+import com.interviai.backend.common.constant.ApiConstants;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -12,7 +13,10 @@ public class SubmitAnswerRequest {
     
     private Integer questionOrder;
     
-    @Size(max = 10000, message = "Answer text must be less than 10000 characters")
+    @Size(
+            max = ApiConstants.MAX_ANSWER_LENGTH,
+            message = "Answer text must be 50000 characters or fewer"
+    )
     private String answerText;
     
     private String answerAudioUrl;

@@ -71,6 +71,7 @@ public class InterviewAnswer extends BaseEntity {
     @Column(name = "suggested_answer", columnDefinition = "TEXT")
     private String suggestedAnswer;
     
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "ai_evaluation", columnDefinition = "jsonb")
     private String aiEvaluation;
     
@@ -86,6 +87,7 @@ public class InterviewAnswer extends BaseEntity {
     @Column(name = "technical_accuracy_score")
     private Double technicalAccuracyScore;
     
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     private String metadata;
     

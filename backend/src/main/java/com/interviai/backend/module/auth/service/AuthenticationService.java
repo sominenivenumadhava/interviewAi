@@ -152,7 +152,8 @@ public class AuthenticationService {
             
             // Create refresh response
             AuthenticationResponse response = authMapper.createRefreshResponse(
-                accessToken, 
+                accessToken,
+                request.getRefreshToken(),
                 jwtService.getAccessTokenValidity()
             );
 

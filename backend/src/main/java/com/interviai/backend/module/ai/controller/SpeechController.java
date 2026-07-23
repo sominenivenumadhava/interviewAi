@@ -18,8 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Mono;
-
+import java.time.Duration;
 import java.util.List;
 
 @RestController
@@ -62,15 +61,32 @@ public class SpeechController {
 
     @PostMapping("/validate")
     @Operation(summary = "Validate candidate speech transcript in real-time using LLM")
-    public Mono<ResponseEntity<ApiResponse<AnswerValidationRequest.Response>>> validateAnswer(
+    public ResponseEntity<ApiResponse<AnswerValidationRequest.Response>> validateAnswer(
             @Valid @RequestBody AnswerValidationRequest.Request request) {
 
         String prompt = buildValidationPrompt(request);
 
-        return aiService.generateContent(prompt)
-                .map(this::parseValidationResponse)
-                .map(response -> ResponseEntity.ok(ApiResponse.success(response, "Answer validated successfully")))
-                .onErrorReturn(ResponseEntity.ok(ApiResponse.success(buildFallbackValidation(request), "Fallback validation generated")));
+        try {
+            AnswerValidationRequest.Response response = aiService.generateContent(prompt)
+                    .map(this::parseValidationResponse)
+                    .block(Duration.ofSeconds(12));
+
+            if (response != null) {
+                return ResponseEntity.ok(ApiResponse.success(response, "Answer validated successfully"));
+            }
+        } catch (Exception e) {
+            /*
+             * This application uses Spring MVC with stateless JWT security. Returning
+             * a Mono from this controller caused an async servlet redispatch after the
+             * AI call; that redispatch lost the SecurityContext and converted a valid
+             * request into a misleading 401. Complete the bounded AI call inside the
+             * original authenticated request and preserve the existing fallback.
+             */
+            log.warn("Answer validation AI call failed, using fallback: {}", e.getMessage());
+        }
+
+        return ResponseEntity.ok(
+                ApiResponse.success(buildFallbackValidation(request), "Fallback validation generated"));
     }
 
     private String buildValidationPrompt(AnswerValidationRequest.Request req) {

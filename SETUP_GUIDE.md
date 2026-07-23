@@ -30,9 +30,10 @@ spring:
 jwt:
   secret: your-256-bit-secret-key-here-must-be-at-least-256-bits
 
-gemini:
+openrouter:
   api:
-    key: your-gemini-api-key-here
+    key: sk-or-v1-your-openrouter-key
+    model: google/gemini-2.5-flash-lite
 
 spring:
   mail:
@@ -154,7 +155,8 @@ The frontend will be available at `http://localhost:5173`
 - `DB_USERNAME` - PostgreSQL username
 - `DB_PASSWORD` - PostgreSQL password
 - `JWT_SECRET` - JWT signing key (256-bit)
-- `GEMINI_API_KEY` - Google Gemini API key
+- `OPENROUTER_API_KEY` - OpenRouter API key
+- `OPENROUTER_MODEL` - Optional model override (defaults to `google/gemini-2.5-flash-lite`)
 - `MAIL_USERNAME` - SMTP email
 - `MAIL_PASSWORD` - SMTP password
 

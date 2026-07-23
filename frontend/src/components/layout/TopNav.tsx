@@ -25,7 +25,7 @@ import { cn } from '../../lib/utils';
 import { Input } from '../ui/Input';
 export function TopNav() {
   const { theme, toggleTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isInterviewsOpen, setIsInterviewsOpen] = useState(false);
@@ -231,14 +231,18 @@ export function TopNav() {
                   </Link>
                 </div>
                 <div className="border-t border-ink-100 py-1 dark:border-ink-800">
-                  <Link
-                  to="/"
-                  onClick={() => setIsProfileOpen(false)}
+                  <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    logout();
+                    window.location.href = '/';
+                  }}
                   className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-danger hover:bg-red-50 dark:hover:bg-red-900/20">
                   
                     <LogOut size={16} />
                     Log out
-                  </Link>
+                  </button>
                 </div>
               </div>
             }

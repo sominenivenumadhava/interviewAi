@@ -32,11 +32,14 @@ export interface RequestConfig extends RequestInit {
   timeout?: number;
 }
 
+const AUTH_REFRESH_ENDPOINT = '/api/v1/auth/refresh';
+
 class ApiClient {
   private baseURL: string;
   private defaultTimeout: number = 15000; // 15 seconds
   private maxRetries: number = 1; // only retry once on 5xx
   private retryDelay: number = 1000;
+  private refreshRequest: Promise<boolean> | null = null;
 
   constructor() {
     // In development: use empty string so all /api/* calls go through Vite's proxy to port 8082.
@@ -66,6 +69,20 @@ class ApiClient {
     } = config;
 
     const url = `${this.baseURL}${endpoint}`;
+
+    // If another request is already refreshing an expired/missing access token,
+    // protected requests must wait for it instead of being sent anonymously.
+    if (!skipAuth && endpoint !== AUTH_REFRESH_ENDPOINT && !this.getAccessToken()) {
+      const refreshed = await this.handleTokenRefresh();
+      if (!refreshed || !this.getAccessToken()) {
+        this.handleAuthFailure();
+        throw new ApiClientError(
+          'Your session has expired. Please log in again.',
+          'AUTH_FAILED',
+          401
+        );
+      }
+    }
 
     // Build headers
     const headers: Record<string, string> = {
@@ -107,13 +124,18 @@ class ApiClient {
 
       // Handle 401 Unauthorized — try token refresh
       if (response.status === 401) {
-        const refreshed = await this.handleTokenRefresh();
-        if (refreshed && retryCount < this.maxRetries) {
-          return this.request<T>(endpoint, { ...config, retryCount: retryCount + 1 });
-        } else {
-          this.handleAuthFailure();
-          throw new ApiClientError('Your session has expired. Please log in again.', 'AUTH_FAILED', 401);
+        // Public/auth requests (especially refresh itself) must never recursively
+        // trigger another refresh attempt.
+        const canRefresh = !skipAuth && endpoint !== AUTH_REFRESH_ENDPOINT;
+        if (canRefresh) {
+          const refreshed = await this.handleTokenRefresh();
+          if (refreshed && retryCount < this.maxRetries) {
+            return this.request<T>(endpoint, { ...config, retryCount: retryCount + 1 });
+          }
         }
+
+        this.handleAuthFailure();
+        throw new ApiClientError('Your session has expired. Please log in again.', 'AUTH_FAILED', 401);
       }
 
       // Handle error responses (4xx, 5xx)
@@ -278,11 +300,30 @@ class ApiClient {
   }
 
   private async handleTokenRefresh(): Promise<boolean> {
+    // Reuse one in-flight refresh when several protected requests receive 401
+    // at the same time. This avoids refresh races and repeated backend calls.
+    if (this.refreshRequest) {
+      return this.refreshRequest;
+    }
+
+    const attempt = this.performTokenRefreshRequest();
+    this.refreshRequest = attempt;
+
+    try {
+      return await attempt;
+    } finally {
+      if (this.refreshRequest === attempt) {
+        this.refreshRequest = null;
+      }
+    }
+  }
+
+  private async performTokenRefreshRequest(): Promise<boolean> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) return false;
 
     try {
-      const response = await this.request('/api/v1/auth/refresh', {
+      const response = await this.request(AUTH_REFRESH_ENDPOINT, {
         method: 'POST',
         skipAuth: true,
         retry: false,
@@ -291,7 +332,10 @@ class ApiClient {
 
       if (response.data) {
         localStorage.setItem('interviai_access_token', response.data.accessToken);
-        localStorage.setItem('interviai_refresh_token', response.data.refreshToken);
+        localStorage.setItem(
+          'interviai_refresh_token',
+          response.data.refreshToken || refreshToken
+        );
         return true;
       }
       return false;
