@@ -97,11 +97,11 @@ public class Interview extends AuditableEntity {
     private List<InterviewAnswer> answers = new ArrayList<>();
     
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
-    @Column(name = "configuration", columnDefinition = "jsonb")
+    @Column(name = "configuration")
     private String configuration;
     
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
-    @Column(name = "metadata", columnDefinition = "jsonb")
+    @Column(name = "metadata")
     private String metadata;
     
     // Utility methods

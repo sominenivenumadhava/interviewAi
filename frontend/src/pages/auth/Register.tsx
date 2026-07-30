@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BrainCircuit, Mail, Lock, User, CheckCircle, AlertCircle, WifiOff, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BrainCircuit, Mail, Lock, User, CheckCircle, AlertCircle, WifiOff, Loader2, ArrowRight } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { ApiError, ApiFieldError } from '../../lib/apiClient';
+import { AuthCanvas } from '../../components/landing/AuthCanvas';
+import { TiltCard } from '../../components/landing/TiltCard';
+import { PageWrapper } from '../../components/ui/PageWrapper';
+import { staggerContainer, fadeUp } from '../../lib/motion';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -57,7 +62,6 @@ export function Register() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-    // Clear field error when user starts typing
     if (error.fields[name]) {
       setError(prev => ({
         ...prev,
@@ -120,50 +124,37 @@ export function Register() {
         acceptPrivacy: formData.acceptPrivacy,
       });
 
-      // Show success state then redirect to login
       setSuccess(true);
       setTimeout(() => navigate('/login'), 2500);
 
     } catch (err: unknown) {
       console.error('[Register] Caught error:', err);
 
-      // Handle ApiError (network, 4xx, 5xx)
       if (err instanceof Error && err.name === 'ApiError') {
         const apiErr = err as ApiError & { fieldErrors?: ApiFieldError[]; details?: ApiFieldError[] };
         const isNetworkError = (apiErr as any).code === 'CONNECTION_REFUSED' ||
                                (apiErr as any).code === 'TIMEOUT' ||
                                (apiErr as any).code === 'NETWORK_ERROR';
 
-        // Map server field errors to our field state
-        // Spring Boot sends them in 'details' array; fallback to 'fieldErrors'
         const rawErrors: ApiFieldError[] = apiErr.fieldErrors || (apiErr as any).details || [];
         const serverFields: Record<string, string> = {};
+
         if (rawErrors.length > 0) {
           rawErrors.forEach((fe: ApiFieldError) => {
-            // Map Spring field names to our form fields
             const fieldMap: Record<string, string> = {
-              email: 'email',
-              password: 'password',
-              confirmPassword: 'confirmPassword',
-              firstName: 'firstName',
-              lastName: 'lastName',
-              acceptTerms: 'acceptTerms',
-              acceptPrivacy: 'acceptPrivacy',
+              email: 'email', password: 'password', confirmPassword: 'confirmPassword',
+              firstName: 'firstName', lastName: 'lastName',
+              acceptTerms: 'acceptTerms', acceptPrivacy: 'acceptPrivacy',
             };
             const localField = fieldMap[fe.field] || fe.field;
             serverFields[localField] = fe.message;
           });
         }
 
-        setError({
-          general: apiErr.message,
-          fields: serverFields,
-          isNetworkError,
-        });
+        setError({ general: apiErr.message, fields: serverFields, isNetworkError });
       } else {
-        // Fallback for unknown errors
         setError({
-          general: err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.',
+          general: err instanceof Error ? err.message : 'An unexpected error occurred.',
           fields: {},
           isNetworkError: false,
         });
@@ -171,25 +162,46 @@ export function Register() {
     }
   };
 
-  // ─── Success state ────────────────────────────────────────────────────────
+  // ─── Success Screen ───────────────────────────────────────────────────────
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-ink-50 dark:bg-ink-950 px-4">
-        <div className="text-center max-w-md">
-          <div className="flex justify-center mb-4">
-            <CheckCircle size={64} className="text-green-500" />
-          </div>
-          <h2 className="text-2xl font-bold text-ink-900 dark:text-white mb-2">
+      <div className="relative min-h-screen flex items-center justify-center bg-[#05060A]">
+        <AuthCanvas />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+          className="relative z-10 text-center max-w-sm mx-4"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: 'spring', stiffness: 300 }}
+            className="flex justify-center mb-6"
+          >
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-green-400 to-emerald-500 shadow-[0_0_40px_rgba(34,197,94,0.4)]">
+              <CheckCircle size={44} className="text-white" />
+            </div>
+          </motion.div>
+          <motion.h2
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="text-3xl font-extrabold text-white mb-3"
+          >
             Account Created!
-          </h2>
-          <p className="text-ink-500 dark:text-ink-400 mb-4">
-            Your account has been successfully created. Redirecting you to the login page…
-          </p>
-          <div className="flex justify-center">
-            <Loader2 size={20} className="animate-spin text-brand-600" />
-          </div>
-        </div>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+            className="text-ink-400 mb-6"
+          >
+            Redirecting you to the login page…
+          </motion.p>
+          <Loader2 size={20} className="animate-spin text-neon-indigo mx-auto" />
+        </motion.div>
       </div>
     );
   }
@@ -197,297 +209,231 @@ export function Register() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex min-h-screen bg-ink-50 dark:bg-ink-950">
-      {/* Form panel */}
-      <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
-        <div className="mx-auto w-full max-w-sm lg:w-96">
+    <PageWrapper>
+      <div className="relative min-h-screen flex items-center justify-center px-4 py-12 bg-[#05060A] text-white selection:bg-brand-500/30">
+        
+        {/* ── Custom Auth Interactive 3D Cyber Background ── */}
+        <AuthCanvas />
 
-          {/* Logo */}
-          <div className="flex items-center gap-2 mb-8">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-600 text-white">
-              <BrainCircuit size={20} />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-ink-900 dark:text-white">
-              InterviAI
-            </span>
-          </div>
+        {/* ── Awwwards 3D Tilt Glass Card ── */}
+        <motion.div
+          variants={staggerContainer}
+          initial="initial"
+          animate="animate"
+          className="relative z-10 w-full max-w-xl"
+        >
+          <TiltCard className="p-8 sm:p-10 border border-white/15 bg-[#090D16]/80 backdrop-blur-2xl shadow-glow-indigo">
 
-          <h2 className="text-2xl font-bold leading-9 tracking-tight text-ink-900 dark:text-white">
-            Create your account
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
-            Already have an account?{' '}
-            <Link to="/login" className="font-semibold text-brand-600 hover:text-brand-500">
-              Sign in instead
-            </Link>
-          </p>
-
-          <div className="mt-10">
+            {/* Brand Logo Header */}
+            <motion.div variants={fadeUp} className="flex flex-col items-center mb-8 text-center">
+              <Link to="/">
+                <motion.div
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-indigo-600 to-violet-600 shadow-glow-indigo mb-4 cursor-pointer"
+                  whileHover={{ scale: 1.08, rotate: 5 }}
+                  transition={{ type: 'spring', stiffness: 300 }}
+                >
+                  <BrainCircuit size={28} className="text-white" />
+                </motion.div>
+              </Link>
+              <h1 className="text-3xl font-black tracking-tight text-white">
+                Join <span className="gradient-text">InterviAI</span>
+              </h1>
+              <p className="mt-1.5 text-sm text-ink-400">
+                Elevate your career with personalized AI mock interviews
+              </p>
+            </motion.div>
 
             {/* General Error Banner */}
-            {error.general && (
-              <div
-                className={`mb-6 rounded-lg p-4 border flex gap-3 ${
-                  error.isNetworkError
-                    ? 'bg-amber-50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-800'
-                    : 'bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800'
-                }`}
-              >
-                <div className="flex-shrink-0 mt-0.5">
-                  {error.isNetworkError
-                    ? <WifiOff size={16} className="text-amber-500" />
-                    : <AlertCircle size={16} className="text-red-500" />
-                  }
-                </div>
-                <div className="flex-1">
-                  <p className={`text-sm font-medium ${
+            <AnimatePresence>
+              {error.general && (
+                <motion.div
+                  key="error"
+                  initial={{ opacity: 0, y: -8, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: 'auto' }}
+                  exit={{ opacity: 0, y: -8, height: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className={`mb-6 rounded-xl p-4 border flex gap-3 ${
                     error.isNetworkError
-                      ? 'text-amber-800 dark:text-amber-400'
-                      : 'text-red-800 dark:text-red-400'
-                  }`}>
-                    {error.isNetworkError ? 'Connection Error' : 'Registration Failed'}
-                  </p>
-                  <p className={`text-sm mt-0.5 ${
-                    error.isNetworkError
-                      ? 'text-amber-700 dark:text-amber-300'
-                      : 'text-red-700 dark:text-red-300'
-                  }`}>
-                    {error.general}
-                  </p>
-                  {error.isNetworkError && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      Make sure the Spring Boot backend is running on port 8082.
+                      ? 'bg-amber-950/40 border-amber-800/50 text-amber-300'
+                      : 'bg-red-950/40 border-red-800/50 text-red-300'
+                  }`}
+                >
+                  <div className="shrink-0 mt-0.5">
+                    {error.isNetworkError
+                      ? <WifiOff size={18} className="text-amber-400" />
+                      : <AlertCircle size={18} className="text-red-400" />
+                    }
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">
+                      {error.isNetworkError ? 'Connection Error' : 'Registration Failed'}
                     </p>
-                  )}
-                </div>
-              </div>
-            )}
+                    <p className="text-xs mt-0.5 opacity-90">{error.general}</p>
+                    {error.isNetworkError && (
+                      <p className="text-xs text-amber-400/80 mt-1">
+                        Ensure the backend is running on port 8082.
+                      </p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Form */}
-            <form onSubmit={handleRegister} className="space-y-5" noValidate>
-
+            <motion.form
+              variants={staggerContainer}
+              onSubmit={handleRegister}
+              className="space-y-5"
+              noValidate
+            >
               {/* Name row */}
-              <div className="grid grid-cols-2 gap-4">
-                <FieldWrapper label="First Name" error={getFieldError('firstName')}>
+              <motion.div variants={fadeUp} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold text-ink-400 uppercase tracking-widest mb-1.5">First Name</label>
                   <Input
-                    type="text"
+                    id="firstName"
                     name="firstName"
+                    type="text"
+                    placeholder="Jane"
                     value={formData.firstName}
                     onChange={handleChange}
-                    required
                     disabled={isLoading}
-                    icon={<User size={16} />}
-                    placeholder="Alex"
+                    autoComplete="given-name"
+                    icon={<User size={16} className="text-ink-400" />}
+                    error={getFieldError('firstName')}
                   />
-                </FieldWrapper>
-
-                <FieldWrapper label="Last Name" error={getFieldError('lastName')}>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink-400 uppercase tracking-widest mb-1.5">Last Name</label>
                   <Input
-                    type="text"
+                    id="lastName"
                     name="lastName"
+                    type="text"
+                    placeholder="Doe"
                     value={formData.lastName}
                     onChange={handleChange}
-                    required
                     disabled={isLoading}
-                    placeholder="Chen"
+                    autoComplete="family-name"
+                    icon={<User size={16} className="text-ink-400" />}
+                    error={getFieldError('lastName')}
                   />
-                </FieldWrapper>
-              </div>
+                </div>
+              </motion.div>
 
-              {/* Email */}
-              <FieldWrapper label="Email address" error={getFieldError('email')}>
+              <motion.div variants={fadeUp}>
+                <label className="block text-xs font-semibold text-ink-400 uppercase tracking-widest mb-1.5">Email Address</label>
                 <Input
-                  type="email"
+                  id="email"
                   name="email"
+                  type="email"
+                  placeholder="jane.doe@example.com"
                   value={formData.email}
                   onChange={handleChange}
-                  required
                   disabled={isLoading}
-                  icon={<Mail size={16} />}
-                  placeholder="you@example.com"
+                  autoComplete="email"
+                  icon={<Mail size={16} className="text-ink-400" />}
+                  error={getFieldError('email')}
                 />
-              </FieldWrapper>
+              </motion.div>
 
-              {/* Password */}
-              <FieldWrapper label="Password" error={getFieldError('password')}>
+              <motion.div variants={fadeUp}>
+                <label className="block text-xs font-semibold text-ink-400 uppercase tracking-widest mb-1.5">Password</label>
                 <Input
-                  type="password"
+                  id="password"
                   name="password"
+                  type="password"
+                  placeholder="••••••••"
                   value={formData.password}
                   onChange={handleChange}
-                  required
                   disabled={isLoading}
-                  icon={<Lock size={16} />}
-                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  icon={<Lock size={16} className="text-ink-400" />}
+                  error={getFieldError('password')}
                 />
-                <p className="mt-1 text-xs text-ink-400">
-                  Min 8 chars with uppercase, lowercase, number, and special character
-                </p>
-              </FieldWrapper>
+                {!getFieldError('password') && (
+                  <p className="mt-1 text-xs text-ink-500">
+                    Min 8 chars · uppercase · lowercase · number · special character
+                  </p>
+                )}
+              </motion.div>
 
-              {/* Confirm password */}
-              <FieldWrapper label="Confirm Password" error={getFieldError('confirmPassword')}>
+              <motion.div variants={fadeUp}>
+                <label className="block text-xs font-semibold text-ink-400 uppercase tracking-widest mb-1.5">Confirm Password</label>
                 <Input
-                  type="password"
+                  id="confirmPassword"
                   name="confirmPassword"
+                  type="password"
+                  placeholder="••••••••"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  required
                   disabled={isLoading}
-                  icon={<Lock size={16} />}
-                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  icon={<Lock size={16} className="text-ink-400" />}
+                  error={getFieldError('confirmPassword')}
                 />
-              </FieldWrapper>
+              </motion.div>
 
               {/* Checkboxes */}
-              <div className="space-y-3">
-                <CheckboxField
-                  id="accept-terms"
-                  name="acceptTerms"
-                  checked={formData.acceptTerms}
-                  onChange={handleChange}
-                  disabled={isLoading}
-                  error={getFieldError('acceptTerms')}
-                  label={
-                    <>
-                      I agree to the{' '}
-                      <a href="#" className="font-semibold text-brand-600 hover:text-brand-500">
-                        Terms of Service
-                      </a>
-                    </>
-                  }
-                />
-
-                <CheckboxField
-                  id="accept-privacy"
-                  name="acceptPrivacy"
-                  checked={formData.acceptPrivacy}
-                  onChange={handleChange}
-                  disabled={isLoading}
-                  error={getFieldError('acceptPrivacy')}
-                  label={
-                    <>
-                      I agree to the{' '}
-                      <a href="#" className="font-semibold text-brand-600 hover:text-brand-500">
-                        Privacy Policy
-                      </a>
-                    </>
-                  }
-                />
-              </div>
+              <motion.div variants={fadeUp} className="space-y-3 pt-1">
+                {[
+                  { name: 'acceptTerms', to: '/terms', label: 'Terms of Service' },
+                  { name: 'acceptPrivacy', to: '/privacy', label: 'Privacy Policy' },
+                ].map(({ name, to, label }) => (
+                  <div key={name}>
+                    <div className="flex items-start gap-3">
+                      <input
+                        id={name}
+                        name={name}
+                        type="checkbox"
+                        checked={formData[name as keyof FormData] as boolean}
+                        onChange={handleChange}
+                        disabled={isLoading}
+                        className="h-4 w-4 mt-0.5 rounded border-white/20 bg-obsidian-900 text-neon-indigo focus:ring-neon-indigo accent-indigo-500"
+                      />
+                      <label htmlFor={name} className="text-sm text-ink-300 cursor-pointer">
+                        I agree to the{' '}
+                        <Link to={to} className="font-semibold text-neon-cyan hover:underline">
+                          {label}
+                        </Link>
+                      </label>
+                    </div>
+                    {getFieldError(name) && (
+                      <p className="mt-1 ml-7 text-xs text-red-400 flex items-center gap-1">
+                        <AlertCircle size={11} /> {getFieldError(name)}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </motion.div>
 
               {/* Submit */}
-              <div>
+              <motion.div variants={fadeUp}>
                 <Button
                   type="submit"
-                  className="w-full"
-                  disabled={isLoading}
+                  isLoading={isLoading}
+                  variant="gradient"
+                  className="w-full h-12 text-sm font-bold gap-2 shadow-glow-indigo mt-2"
                 >
-                  {isLoading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 size={16} className="animate-spin" />
-                      Creating account…
-                    </span>
-                  ) : (
-                    'Create account'
-                  )}
+                  Create Account <ArrowRight size={16} />
                 </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+              </motion.div>
+            </motion.form>
+
+            {/* Sign in link */}
+            <motion.div
+              variants={fadeUp}
+              className="mt-8 text-center border-t border-white/10 pt-6"
+            >
+              <p className="text-sm text-ink-400">
+                Already have an account?{' '}
+                <Link to="/login" className="font-bold text-brand-400 hover:text-white transition-colors">
+                  Sign in instead
+                </Link>
+              </p>
+            </motion.div>
+          </TiltCard>
+        </motion.div>
       </div>
-
-      {/* Right panel */}
-      <div className="relative hidden w-0 flex-1 lg:block bg-ink-900">
-        <div className="absolute inset-0 flex items-center justify-center p-12">
-          <div className="max-w-lg text-center">
-            <BrainCircuit size={64} className="mx-auto text-brand-500 mb-8" />
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Start Your Journey
-            </h2>
-            <p className="text-ink-300 text-lg">
-              Get access to personalized AI interviews, detailed skill gap
-              analysis, and a custom learning roadmap.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function FieldWrapper({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium leading-6 text-ink-900 dark:text-ink-100">
-        {label}
-      </label>
-      <div className="mt-2">{children}</div>
-      {error && (
-        <p className="mt-1 flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
-          <AlertCircle size={12} />
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function CheckboxField({
-  id,
-  name,
-  checked,
-  onChange,
-  disabled,
-  error,
-  label,
-}: {
-  id: string;
-  name: string;
-  checked: boolean;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  disabled: boolean;
-  error?: string;
-  label: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="flex items-start">
-        <input
-          id={id}
-          name={name}
-          type="checkbox"
-          checked={checked}
-          onChange={onChange}
-          disabled={disabled}
-          className={`h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-600 dark:border-ink-700 dark:bg-ink-900 mt-0.5 ${
-            error ? 'border-red-400' : ''
-          }`}
-        />
-        <label
-          htmlFor={id}
-          className="ml-3 block text-sm leading-6 text-ink-700 dark:text-ink-300"
-        >
-          {label}
-        </label>
-      </div>
-      {error && (
-        <p className="mt-0.5 ml-7 flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
-          <AlertCircle size={12} />
-          {error}
-        </p>
-      )}
-    </div>
+    </PageWrapper>
   );
 }

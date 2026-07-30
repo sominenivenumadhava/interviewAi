@@ -1,55 +1,70 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, PieChart, Pie, Cell,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from 'recharts';
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription
+  Card, CardContent, CardHeader, CardTitle, CardDescription,
 } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { Award, Target, TrendingUp, Clock, CheckCircle2, AlertTriangle, BookOpen, ExternalLink } from 'lucide-react';
+import { MotionCard } from '../components/ui/MotionCard';
+import { PageHeader } from '../components/ui/PageHeader';
+import { SkeletonStat, SkeletonChart, SkeletonCard } from '../components/ui/Skeleton';
+import { Award, Target, TrendingUp, Clock, CheckCircle2, BookOpen } from 'lucide-react';
 import apiClient, { API_ENDPOINTS } from '../lib/apiClient';
 
+// ─── Consistent chart colors ───────────────────────────────────────────────────
+const C = {
+  indigo:  '#6366f1',
+  cyan:    '#06b6d4',
+  emerald: '#10b981',
+  amber:   '#f59e0b',
+  rose:    '#f43f5e',
+  violet:  '#8b5cf6',
+};
+
+const CHART_COLORS = [C.indigo, C.emerald, C.amber, C.rose, C.cyan];
+
+const tooltipStyle = {
+  backgroundColor: '#0b0f19',
+  border: '1px solid rgba(255,255,255,0.07)',
+  borderRadius: '12px',
+  color: '#e2e8f0',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+  fontSize: '12px',
+  padding: '8px 12px',
+};
+
+// ─── Stagger container ────────────────────────────────────────────────────────
+const stagger = {
+  initial:  {},
+  animate:  { transition: { staggerChildren: 0.08 } },
+};
+const fadeSlide = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.25, 0.1, 0.25, 1] } },
+};
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
 export function Analytics() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData]       = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const res = await apiClient.get(API_ENDPOINTS.ANALYTICS.USER);
-        if (res.data) {
-          setData(res.data);
-        }
+        if (res.data) setData(res.data);
       } catch (err) {
-        console.warn('Analytics API fallback loaded:', err);
+        console.warn('Analytics fallback:', err);
       } finally {
         setLoading(false);
       }
     };
     fetchData();
   }, []);
-
-  const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   const weeklyPracticeData = [
     { name: 'Mon', hours: 1.5 },
@@ -58,7 +73,7 @@ export function Analytics() {
     { name: 'Thu', hours: 3.2 },
     { name: 'Fri', hours: 2.5 },
     { name: 'Sat', hours: 4.0 },
-    { name: 'Sun', hours: 3.0 }
+    { name: 'Sun', hours: 3.0 },
   ];
 
   const scoreTrendData = [
@@ -66,212 +81,310 @@ export function Analytics() {
     { date: 'Week 2', score: 74 },
     { date: 'Week 3', score: 78 },
     { date: 'Week 4', score: 82 },
-    { date: 'Week 5', score: 86 }
+    { date: 'Week 5', score: 86 },
   ];
 
   const skillRadarData = [
-    { subject: 'Technical Accuracy', score: 85 },
+    { subject: 'Technical',    score: 85 },
     { subject: 'Communication', score: 90 },
-    { subject: 'System Architecture', score: 76 },
-    { subject: 'STAR Behavioral', score: 92 },
+    { subject: 'Architecture', score: 76 },
+    { subject: 'Behavioral',   score: 92 },
     { subject: 'Coding Speed', score: 80 },
-    { subject: 'Problem Solving', score: 84 }
+    { subject: 'Problem Solve', score: 84 },
   ];
 
   const companyPerfData = [
-    { company: 'Google', score: 84 },
+    { company: 'Google',    score: 84 },
     { company: 'Microsoft', score: 88 },
-    { company: 'Amazon', score: 82 },
-    { company: 'Meta', score: 78 },
-    { company: 'Stripe', score: 86 }
+    { company: 'Amazon',    score: 82 },
+    { company: 'Meta',      score: 78 },
+    { company: 'Stripe',    score: 86 },
   ];
 
-  const difficultyDistribution = [
-    { name: 'Easy', value: 20 },
+  const difficultyData = [
+    { name: 'Easy',   value: 20 },
     { name: 'Medium', value: 55 },
-    { name: 'Hard', value: 25 }
+    { name: 'Hard',   value: 25 },
   ];
+
+  const difficultyColors = [C.emerald, C.amber, C.rose];
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-ink-900 dark:text-white">
-          Comprehensive Interview Analytics
-        </h1>
-        <p className="mt-1 text-ink-500 dark:text-ink-400">
-          In-depth breakdown across skill heatmaps, company performance, difficulty distribution, and learning pathways.
-        </p>
-      </div>
 
-      {/* Metric Summaries */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-ink-500 uppercase">Overall Score</p>
-              <p className="text-2xl font-bold text-emerald-400 mt-1">84.5%</p>
-            </div>
-            <Award className="h-8 w-8 text-emerald-500" />
-          </CardContent>
-        </Card>
+      <PageHeader
+        title="Analytics Overview"
+        subtitle="In-depth breakdown across skill heatmaps, company performance, and learning pathways."
+      />
 
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-ink-500 uppercase">Completion Rate</p>
-              <p className="text-2xl font-bold text-brand-400 mt-1">96%</p>
-            </div>
-            <CheckCircle2 className="h-8 w-8 text-brand-500" />
-          </CardContent>
-        </Card>
+      {/* ── Stat Cards ── */}
+      {loading ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[0,1,2,3].map(i => <SkeletonStat key={i} />)}
+        </div>
+      ) : (
+        <motion.div
+          variants={stagger}
+          initial="initial"
+          animate="animate"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+        >
+          <motion.div variants={fadeSlide}>
+            <MotionCard
+              title="Overall Score"
+              value={84.5}
+              suffix="%"
+              icon={<Award size={20} />}
+              iconColor="bg-emerald-500/10"
+              iconTextColor="text-emerald-500"
+              accentColor="border-l-emerald-500"
+            />
+          </motion.div>
+          <motion.div variants={fadeSlide}>
+            <MotionCard
+              title="Completion Rate"
+              value={96}
+              suffix="%"
+              icon={<CheckCircle2 size={20} />}
+              iconColor="bg-brand-500/10"
+              iconTextColor="text-brand-500"
+              accentColor="border-l-brand-500"
+            />
+          </motion.div>
+          <motion.div variants={fadeSlide}>
+            <MotionCard
+              title="Avg Duration"
+              value={42}
+              suffix=" min"
+              icon={<Clock size={20} />}
+              iconColor="bg-amber-500/10"
+              iconTextColor="text-amber-500"
+              accentColor="border-l-amber-500"
+            />
+          </motion.div>
+          <motion.div variants={fadeSlide}>
+            <MotionCard
+              title="Readiness"
+              value="Tier 1"
+              icon={<Target size={20} />}
+              iconColor="bg-violet-500/10"
+              iconTextColor="text-violet-500"
+              accentColor="border-l-violet-500"
+              animate={false}
+            />
+          </motion.div>
+        </motion.div>
+      )}
 
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-ink-500 uppercase">Avg Duration</p>
-              <p className="text-2xl font-bold text-amber-400 mt-1">42 mins</p>
-            </div>
-            <Clock className="h-8 w-8 text-amber-500" />
-          </CardContent>
-        </Card>
+      {/* ── Row 1: Radar + Weekly Bar ── */}
+      {loading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SkeletonChart />
+          <SkeletonChart />
+        </div>
+      ) : (
+        <motion.div
+          variants={stagger}
+          initial="initial"
+          animate="animate"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+        >
+          <motion.div variants={fadeSlide}>
+            <Card hoverable>
+              <CardHeader>
+                <CardTitle>Skill Performance Radar</CardTitle>
+                <CardDescription>Multi-dimensional interview competency heatmap</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={skillRadarData}>
+                    <PolarGrid stroke="rgba(255,255,255,0.07)" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 11 }} />
+                    <PolarRadiusAxis domain={[0, 100]} tick={{ fill: '#475569', fontSize: 9 }} />
+                    <Radar
+                      name="Score"
+                      dataKey="score"
+                      stroke={C.indigo}
+                      fill={C.indigo}
+                      fillOpacity={0.25}
+                      animationDuration={1200}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-ink-500 uppercase">Company Readiness</p>
-              <p className="text-2xl font-bold text-purple-400 mt-1">Tier 1 Ready</p>
-            </div>
-            <Target className="h-8 w-8 text-purple-500" />
-          </CardContent>
-        </Card>
-      </div>
+          <motion.div variants={fadeSlide}>
+            <Card hoverable>
+              <CardHeader>
+                <CardTitle>Weekly Practice Intensity</CardTitle>
+                <CardDescription>Hours dedicated per day this week</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={weeklyPracticeData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                    <Bar dataKey="hours" fill={C.emerald} radius={[5, 5, 0, 0]} animationDuration={1000} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      )}
 
-      {/* Row 1 Charts — Radar Skill Heatmap & Score Progression */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Radar Skill Heatmap */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Skill Performance Radar</CardTitle>
-            <CardDescription>Multi-dimensional interview competency</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={skillRadarData}>
-                <PolarGrid stroke="#334155" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <PolarRadiusAxis domain={[0, 100]} />
-                <Radar name="Candidate Score" dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.5} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* ── Row 2: Company + Difficulty ── */}
+      {loading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2"><SkeletonChart /></div>
+          <SkeletonChart />
+        </div>
+      ) : (
+        <motion.div
+          variants={stagger}
+          initial="initial"
+          animate="animate"
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        >
+          <motion.div variants={fadeSlide} className="lg:col-span-2">
+            <Card hoverable>
+              <CardHeader>
+                <CardTitle>Company-wise Average Score</CardTitle>
+                <CardDescription>Performance benchmarked per company</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={companyPerfData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.06)" />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="company" type="category" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} width={70} />
+                    <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                    <Bar dataKey="score" fill={C.indigo} radius={[0, 5, 5, 0]} barSize={22} animationDuration={1000} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-        {/* Weekly Practice Bar Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Weekly Practice Intensity (Hours)</CardTitle>
-            <CardDescription>Hours dedicated per day</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyPracticeData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
-                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderRadius: '8px', border: 'none' }} />
-                <Bar dataKey="hours" fill="#10b981" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Row 2 Charts — Company-wise Performance & Difficulty Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Company Performance Bar */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Company-wise Average Score</CardTitle>
-            <CardDescription>Performance benchmarked against specific company bars</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[280px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={companyPerfData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                <YAxis dataKey="company" type="category" tick={{ fill: '#ffffff', fontSize: 12 }} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderRadius: '8px', border: 'none' }} />
-                <Bar dataKey="score" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={20} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Difficulty Distribution Pie Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Difficulty Breakdown</CardTitle>
-            <CardDescription>Ratio of Easy / Medium / Hard questions</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[280px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={difficultyDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                  {difficultyDistribution.map((_entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          <motion.div variants={fadeSlide}>
+            <Card hoverable>
+              <CardHeader>
+                <CardTitle>Difficulty Breakdown</CardTitle>
+                <CardDescription>Easy / Medium / Hard distribution</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[280px] flex flex-col items-center justify-center">
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={difficultyData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      animationDuration={1000}
+                    >
+                      {difficultyData.map((_, i) => (
+                        <Cell key={i} fill={difficultyColors[i]} strokeWidth={0} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex gap-4 mt-2">
+                  {difficultyData.map((d, i) => (
+                    <div key={d.name} className="flex items-center gap-1.5 text-xs text-ink-400">
+                      <div className="h-2.5 w-2.5 rounded-full" style={{ background: difficultyColors[i] }} />
+                      <span>{d.name}</span>
+                      <span className="font-semibold text-ink-200">{d.value}%</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderRadius: '8px', border: 'none' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      )}
 
-      {/* Recommended Learning Path & Recommended LeetCode */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen size={18} className="text-brand-400" />
-              Recommended LeetCode Practice
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-xs">
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-ink-800/40 border border-ink-700/50">
-              <span className="font-semibold text-ink-100">1. LRU Cache (Design)</span>
-              <Badge variant="danger">Hard</Badge>
-            </div>
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-ink-800/40 border border-ink-700/50">
-              <span className="font-semibold text-ink-100">2. Course Schedule II (Topological Sort)</span>
-              <Badge variant="warning">Medium</Badge>
-            </div>
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-ink-800/40 border border-ink-700/50">
-              <span className="font-semibold text-ink-100">3. Search Suggestions System (Trie)</span>
-              <Badge variant="warning">Medium</Badge>
-            </div>
-          </CardContent>
-        </Card>
+      {/* ── Row 3: Learning Recommendations ── */}
+      {loading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      ) : (
+        <motion.div
+          variants={stagger}
+          initial="initial"
+          animate="animate"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+        >
+          <motion.div variants={fadeSlide}>
+            <Card hoverable>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen size={16} className="text-brand-400" />
+                  Recommended LeetCode Practice
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2.5">
+                {[
+                  { title: '1. LRU Cache (Design)',                 level: 'danger' as const,  label: 'Hard'   },
+                  { title: '2. Course Schedule II (Topological Sort)', level: 'warning' as const, label: 'Medium' },
+                  { title: '3. Search Suggestions System (Trie)',     level: 'warning' as const, label: 'Medium' },
+                ].map((p, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-3 rounded-xl bg-ink-50 dark:bg-white/[0.03] border border-ink-100 dark:border-white/5 hover:border-brand-500/30 transition-colors"
+                  >
+                    <span className="text-sm font-medium text-ink-800 dark:text-ink-200">{p.title}</span>
+                    <Badge variant={p.level}>{p.label}</Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </motion.div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp size={18} className="text-emerald-400" />
-              Recommended Learning Roadmap
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-xs">
-            <div className="p-2.5 rounded-lg bg-ink-800/40 border border-ink-700/50">
-              <p className="font-semibold text-emerald-400">Distributed Caching Patterns</p>
-              <p className="text-ink-400 mt-0.5">Study Redis write-through vs cache-aside strategies for System Design rounds.</p>
-            </div>
-            <div className="p-2.5 rounded-lg bg-ink-800/40 border border-ink-700/50">
-              <p className="font-semibold text-brand-400">STAR Behavioral Metrics</p>
-              <p className="text-ink-400 mt-0.5">Quantify impact in leadership answers (e.g. latency reduced from 200ms to 45ms).</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <motion.div variants={fadeSlide}>
+            <Card hoverable>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp size={16} className="text-emerald-400" />
+                  Recommended Learning Roadmap
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2.5">
+                {[
+                  {
+                    title: 'Distributed Caching Patterns',
+                    desc: 'Study Redis write-through vs cache-aside strategies for System Design rounds.',
+                    color: 'text-emerald-400',
+                  },
+                  {
+                    title: 'STAR Behavioral Metrics',
+                    desc: 'Quantify impact in leadership answers (e.g. latency reduced from 200ms to 45ms).',
+                    color: 'text-brand-400',
+                  },
+                ].map((r, i) => (
+                  <div
+                    key={i}
+                    className="p-3.5 rounded-xl bg-ink-50 dark:bg-white/[0.03] border border-ink-100 dark:border-white/5 hover:border-brand-500/30 transition-colors"
+                  >
+                    <p className={`text-sm font-semibold ${r.color}`}>{r.title}</p>
+                    <p className="text-xs text-ink-500 dark:text-ink-400 mt-1 leading-relaxed">{r.desc}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }

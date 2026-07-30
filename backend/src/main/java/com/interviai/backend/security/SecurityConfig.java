@@ -87,8 +87,16 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // Disable CSRF for stateless API
+            // Disable CSRF for stateless JWT-based API
             .csrf(AbstractHttpConfigurer::disable)
+            
+            // Disable form-based login (REST API uses JWT, not session/form auth).
+            // This removes DefaultLoginPageGeneratingFilter and prevents it from
+            // intercepting POST /api/v1/auth/login with CSRF or session checks.
+            .formLogin(AbstractHttpConfigurer::disable)
+            
+            // Disable HTTP Basic auth (not needed for JWT API)
+            .httpBasic(AbstractHttpConfigurer::disable)
             
             // Enable CORS
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -141,7 +149,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**").authenticated()
                 
                 // OAuth2 endpoints
-                .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                .requestMatchers("/oauth2/**", "/login/oauth2/**", "/login").permitAll()
                 
                 // Default - require authentication
                 .anyRequest().authenticated()
@@ -151,7 +159,12 @@ public class SecurityConfig {
             .authenticationProvider(authenticationProvider)
             
             // OAuth2 login configuration
+            // NOTE: .loginPage() must be set to a custom URL to disable Spring's
+            // DefaultLoginPageGeneratingFilter, which otherwise intercepts ALL
+            // unauthenticated requests (including POST /api/v1/auth/login) and
+            // returns an HTML page instead of passing them to the REST controller.
             .oauth2Login(oauth2 -> oauth2
+                .loginPage("/login")
                 .userInfoEndpoint(userInfo -> userInfo
                     .userService(customOAuth2UserService)
                 )

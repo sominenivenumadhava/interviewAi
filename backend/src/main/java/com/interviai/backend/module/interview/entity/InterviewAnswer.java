@@ -72,7 +72,7 @@ public class InterviewAnswer extends BaseEntity {
     private String suggestedAnswer;
     
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
-    @Column(name = "ai_evaluation", columnDefinition = "jsonb")
+    @Column(name = "ai_evaluation")
     private String aiEvaluation;
     
     @Column(name = "confidence_score")
@@ -88,7 +88,7 @@ public class InterviewAnswer extends BaseEntity {
     private Double technicalAccuracyScore;
     
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
-    @Column(name = "metadata", columnDefinition = "jsonb")
+    @Column(name = "metadata")
     private String metadata;
     
     // Utility methods

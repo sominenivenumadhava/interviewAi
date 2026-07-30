@@ -75,8 +75,8 @@
             <column name="improvements" type="TEXT"/>
 
             <!-- JSON Config -->
-            <column name="configuration" type="JSONB"/>
-            <column name="metadata" type="JSONB"/>
+            <column name="configuration" type="JSON"/>
+            <column name="metadata" type="JSON"/>
         </createTable>
 
         <createIndex tableName="interviews" indexName="idx_interviews_user_id">
@@ -131,7 +131,7 @@
             </column>
             <column name="reference_answer" type="TEXT"/>
             <column name="hints" type="TEXT"/>
-            <column name="metadata" type="JSONB"/>
+            <column name="metadata" type="JSON"/>
         </createTable>
 
         <createIndex tableName="interview_questions" indexName="idx_interview_questions_interview_id">
@@ -219,7 +219,7 @@
             <column name="rating" type="VARCHAR(50)"/>
             <column name="feedback" type="TEXT"/>
             <column name="suggested_answer" type="TEXT"/>
-            <column name="ai_evaluation" type="JSONB"/>
+            <column name="ai_evaluation" type="JSON"/>
 
             <!-- Sub-scores -->
             <column name="confidence_score" type="DOUBLE PRECISION"/>
@@ -227,7 +227,7 @@
             <column name="relevance_score" type="DOUBLE PRECISION"/>
             <column name="technical_accuracy_score" type="DOUBLE PRECISION"/>
 
-            <column name="metadata" type="JSONB"/>
+            <column name="metadata" type="JSON"/>
         </createTable>
 
         <addUniqueConstraint

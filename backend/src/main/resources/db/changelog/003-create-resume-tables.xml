@@ -43,7 +43,7 @@
             <!-- Extracted and parsed content -->
             <column name="extracted_text" type="TEXT"/>
             
-            <column name="parsed_content" type="JSONB"/>
+            <column name="parsed_content" type="JSON"/>
 
             <!-- Personal information -->
             <column name="full_name" type="VARCHAR(200)"/>

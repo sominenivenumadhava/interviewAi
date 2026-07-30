@@ -58,7 +58,7 @@ public class InterviewQuestion extends BaseEntity {
     private InterviewAnswer answer;
     
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
-    @Column(name = "metadata", columnDefinition = "jsonb")
+    @Column(name = "metadata")
     private String metadata;
     
     // Utility methods
