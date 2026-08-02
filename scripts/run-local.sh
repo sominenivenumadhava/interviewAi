@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Start InterviAI on YOUR machine (not the cloud agent).
 # Prerequisites: Java 21+, Maven 3.9+, Node 18+, Docker (for Postgres)
+#
+# Optional ports (env or flags):
+#   FE_PORT=3000 ./scripts/run-local.sh
+#   ./scripts/run-local.sh --port 3000
+#   ./scripts/run-local.sh --fe-port 3000 --be-port 8082
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,6 +15,34 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 NC='\033[0m'
+
+FE_PORT_DEFAULT=5173
+BE_PORT_DEFAULT=8082
+CLI_FE_PORT=""
+CLI_BE_PORT=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p|--port|--fe-port)
+      CLI_FE_PORT="$2"
+      shift 2
+      ;;
+    --be-port)
+      CLI_BE_PORT="$2"
+      shift 2
+      ;;
+    -h|--help)
+      echo "Usage: ./scripts/run-local.sh [--port 3000] [--be-port 8082]"
+      echo "   or: FE_PORT=3000 ./scripts/run-local.sh"
+      exit 0
+      ;;
+    *)
+      echo -e "${RED}Unknown option: $1${NC}"
+      echo "Usage: ./scripts/run-local.sh [--port 3000] [--be-port 8082]"
+      exit 1
+      ;;
+  esac
+done
 
 need() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -43,11 +76,19 @@ if [[ ! -f .env ]]; then
   echo -e "${GREEN}Created .env from .env.template (DB_PORT=5433 for Docker Postgres).${NC}"
 fi
 
+# Preserve ports passed on the shell before sourcing .env
+PRESET_FE_PORT="${FE_PORT:-}"
+PRESET_BE_PORT="${BE_PORT:-${SERVER_PORT:-}}"
+
 # Load .env into this shell (safe subset)
 set -a
 # shellcheck disable=SC1091
 source .env
 set +a
+
+# Priority: CLI flag > pre-set env > .env > default
+FE_PORT="${CLI_FE_PORT:-${PRESET_FE_PORT:-${FE_PORT:-$FE_PORT_DEFAULT}}}"
+BE_PORT="${CLI_BE_PORT:-${PRESET_BE_PORT:-${BE_PORT:-${SERVER_PORT:-$BE_PORT_DEFAULT}}}}"
 
 export SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE:-dev}"
 export DB_HOST="${DB_HOST:-localhost}"
@@ -56,9 +97,17 @@ export DB_NAME="${DB_NAME:-interviai_dev}"
 export DB_USERNAME="${DB_USERNAME:-interviai_user}"
 export DB_PASSWORD="${DB_PASSWORD:-interviai_password}"
 export JWT_SECRET="${JWT_SECRET:-local-dev-only-jwt-secret-do-not-use-in-prod-404E635266556A586E3272357538782F}"
+export SERVER_PORT="$BE_PORT"
+export FRONTEND_URL="${FRONTEND_URL:-http://localhost:${FE_PORT}}"
+
+# If FRONTEND_URL still points at another port, refresh it to match FE_PORT
+if [[ "$FRONTEND_URL" == http://localhost:* || "$FRONTEND_URL" == http://127.0.0.1:* ]]; then
+  export FRONTEND_URL="http://localhost:${FE_PORT}"
+fi
 
 mkdir -p "$ROOT/.local-run"
 
+echo -e "${CYAN}▶ Ports: frontend=${FE_PORT}  backend=${BE_PORT}${NC}"
 echo -e "${CYAN}▶ Starting Postgres + Redis (Docker)…${NC}"
 
 container_exists() {
@@ -128,21 +177,23 @@ if [[ ! -d frontend/node_modules ]]; then
   (cd frontend && npm ci)
 fi
 
-# Avoid duplicate backend/frontend if already healthy
-if curl -sf http://127.0.0.1:8082/actuator/health >/dev/null 2>&1; then
-  echo -e "${GREEN}▶ Backend already healthy on :8082${NC}"
+# Avoid duplicate backend/frontend if already healthy on the requested ports
+if curl -sf "http://127.0.0.1:${BE_PORT}/actuator/health" >/dev/null 2>&1; then
+  echo -e "${GREEN}▶ Backend already healthy on :${BE_PORT}${NC}"
 else
-  echo -e "${CYAN}▶ Starting backend on :8082…${NC}"
+  echo -e "${CYAN}▶ Starting backend on :${BE_PORT}…${NC}"
   (
     cd backend
-    nohup mvn -q spring-boot:run -Dspring-boot.run.profiles=dev \
+    nohup mvn -q spring-boot:run \
+      -Dspring-boot.run.profiles=dev \
+      -Dspring-boot.run.arguments="--server.port=${BE_PORT}" \
       >"$ROOT/.local-run/backend.log" 2>&1 &
     echo $! >"$ROOT/.local-run/backend.pid"
   )
 
   echo -e "${CYAN}▶ Waiting for backend health…${NC}"
   for i in $(seq 1 90); do
-    if curl -sf http://127.0.0.1:8082/actuator/health >/dev/null 2>&1; then
+    if curl -sf "http://127.0.0.1:${BE_PORT}/actuator/health" >/dev/null 2>&1; then
       break
     fi
     sleep 2
@@ -154,26 +205,36 @@ else
   done
 fi
 
-if curl -sf http://127.0.0.1:5173/ >/dev/null 2>&1; then
-  echo -e "${GREEN}▶ Frontend already responding on :5173${NC}"
+# Point Vite's /api proxy at the chosen backend port for this run
+export VITE_DEV_API_TARGET="http://127.0.0.1:${BE_PORT}"
+
+if curl -sf "http://127.0.0.1:${FE_PORT}/" >/dev/null 2>&1; then
+  echo -e "${GREEN}▶ Frontend already responding on :${FE_PORT}${NC}"
 else
-  echo -e "${CYAN}▶ Starting frontend on :5173…${NC}"
+  echo -e "${CYAN}▶ Starting frontend on :${FE_PORT}…${NC}"
   (
     cd frontend
-    nohup npm run dev -- --host 127.0.0.1 --port 5173 \
+    nohup npm run dev -- --host 127.0.0.1 --port "$FE_PORT" --strictPort \
       >"$ROOT/.local-run/frontend.log" 2>&1 &
     echo $! >"$ROOT/.local-run/frontend.pid"
   )
   sleep 2
 fi
 
+# Persist chosen ports for stop script / next time
+printf '%s\n' "$FE_PORT" >"$ROOT/.local-run/fe.port"
+printf '%s\n' "$BE_PORT" >"$ROOT/.local-run/be.port"
+
 echo ""
 echo -e "${GREEN}InterviAI is running on your machine.${NC}"
 echo ""
-echo "  App:     http://localhost:5173"
-echo "  API:     http://localhost:8082"
-echo "  Swagger: http://localhost:8082/swagger-ui/index.html"
+echo "  App:     http://localhost:${FE_PORT}"
+echo "  API:     http://localhost:${BE_PORT}"
+echo "  Swagger: http://localhost:${BE_PORT}/swagger-ui/index.html"
 echo ""
 echo "  Logs:    .local-run/backend.log  .local-run/frontend.log"
 echo "  Stop:    ./scripts/stop-local.sh"
+echo ""
+echo "  Tip:     FE_PORT=3000 ./scripts/run-local.sh"
+echo "           ./scripts/run-local.sh --port 3000"
 echo ""

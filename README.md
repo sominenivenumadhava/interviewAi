@@ -54,6 +54,16 @@ chmod +x scripts/*.sh
 
 Then open **http://localhost:5173** in your browser.
 
+**Different frontend port** (example `3000`):
+
+```bash
+./scripts/run-local.sh --port 3000
+# or:
+FE_PORT=3000 ./scripts/run-local.sh
+```
+
+Then open **http://localhost:3000**. Backend stays on `8082` unless you pass `--be-port`.
+
 Stop everything:
 
 ```bash
