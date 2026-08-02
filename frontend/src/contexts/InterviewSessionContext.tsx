@@ -74,9 +74,7 @@ export const InterviewSessionProvider: React.FC<{ children: ReactNode }> = ({ ch
   };
 
   const endSessionState = () => {
-    if (activeSession) {
-      setActiveSession({ ...activeSession, status: 'completed' });
-    }
+    setActiveSession(null);
   };
 
   return (

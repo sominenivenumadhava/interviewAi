@@ -26,6 +26,7 @@ import com.interviai.backend.module.user.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -97,7 +98,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
-        List<Interview> companyInterviews = interviewRepository.findByUser(user, null).getContent().stream()
+        List<Interview> companyInterviews = interviewRepository.findByUser(user, Pageable.unpaged()).getContent().stream()
                 .filter(i -> company.equalsIgnoreCase(i.getCompany()))
                 .collect(Collectors.toList());
         
@@ -131,7 +132,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         List<Interview> interviews = interviewRepository.findByUserAndStatus(
-                user, InterviewStatus.COMPLETED, null).getContent();
+                user, InterviewStatus.COMPLETED, Pageable.unpaged()).getContent();
         
         Map<String, List<Interview>> interviewsByRole = interviews.stream()
                 .collect(Collectors.groupingBy(Interview::getRole));
@@ -165,7 +166,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         List<Interview> interviews = interviewRepository.findByUserAndStatus(
-                user, InterviewStatus.COMPLETED, null).getContent().stream()
+                user, InterviewStatus.COMPLETED, Pageable.unpaged()).getContent().stream()
                 .sorted(Comparator.comparing(Interview::getCompletedAt))
                 .collect(Collectors.toList());
         
@@ -214,7 +215,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         insights.setTargetRole(targetRole);
         
         // Get recent performance for similar roles
-        List<Interview> similarRoleInterviews = interviewRepository.findByUser(user, null).getContent().stream()
+        List<Interview> similarRoleInterviews = interviewRepository.findByUser(user, Pageable.unpaged()).getContent().stream()
                 .filter(i -> i.getRole().toLowerCase().contains(targetRole.toLowerCase()) ||
                            targetRole.toLowerCase().contains(i.getRole().toLowerCase()))
                 .filter(i -> i.getOverallScore() != null)

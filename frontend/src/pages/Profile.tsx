@@ -7,7 +7,8 @@ import {
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PageHeader } from '../components/ui/PageHeader';
-import { mockUser } from '../data/mockData';
+import { useAuth } from '../contexts/AuthContext';
+import apiClient, { API_ENDPOINTS } from '../lib/apiClient';
 import { cn } from '../lib/utils';
 
 type NavSection = 'general' | 'security' | 'notifications' | 'danger';
@@ -20,12 +21,34 @@ const navSections: { id: NavSection; label: string; icon: React.ElementType; dan
 ];
 
 export function Profile() {
+  const { user, updateUser } = useAuth();
   const [activeSection, setActiveSection] = useState<NavSection>('general');
   const [saved, setSaved] = useState(false);
+  const [notifEmails, setNotifEmails] = useState(user?.notificationEmailsEnabled ?? true);
+  const [marketingEmails, setMarketingEmails] = useState(user?.marketingEmailsEnabled ?? false);
+
+  const displayName = user
+    ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'User'
+    : '';
+  const avatarUrl =
+    user?.profilePictureUrl ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName || 'User')}&background=14b8a6&color=fff&bold=true`;
 
   const handleSave = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const persistPreference = async (updates: {
+    notificationEmailsEnabled?: boolean;
+    marketingEmailsEnabled?: boolean;
+  }) => {
+    updateUser(updates);
+    try {
+      await apiClient.put(API_ENDPOINTS.USER.PREFERENCES, updates);
+    } catch (err) {
+      console.warn('Failed to save preferences:', err);
+    }
   };
 
   return (
@@ -36,7 +59,6 @@ export function Profile() {
       />
 
       <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
-        {/* ── Sidebar Nav ── */}
         <div className="md:col-span-1">
           <nav className="flex flex-col gap-1">
             {navSections.map((section) => {
@@ -74,7 +96,6 @@ export function Profile() {
           </nav>
         </div>
 
-        {/* ── Content ── */}
         <div className="space-y-6 md:col-span-3">
           {activeSection === 'general' && (
             <motion.div
@@ -89,12 +110,11 @@ export function Profile() {
                   <CardDescription>Update your personal details and avatar.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Avatar */}
                   <div className="flex items-center gap-5">
                     <div className="relative group">
                       <img
-                        src={mockUser.avatar}
-                        alt={mockUser.name}
+                        src={avatarUrl}
+                        alt={displayName}
                         className="h-20 w-20 rounded-2xl object-cover border-2 border-ink-100 dark:border-white/10"
                       />
                       <div className="absolute inset-0 rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -107,19 +127,18 @@ export function Profile() {
                     </div>
                   </div>
 
-                  {/* Form */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1.5">
                         Full Name
                       </label>
-                      <Input defaultValue={mockUser.name} icon={<User size={15} />} />
+                      <Input defaultValue={displayName} icon={<User size={15} />} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1.5">
                         Email
                       </label>
-                      <Input defaultValue={mockUser.email} icon={<Mail size={15} />} type="email" />
+                      <Input defaultValue={user?.email || ''} icon={<Mail size={15} />} type="email" />
                     </div>
                   </div>
 
@@ -183,20 +202,38 @@ export function Profile() {
                   <CardDescription>Choose how you want to be notified.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {[
-                    'Interview reminders',
-                    'Score updates',
-                    'New feature announcements',
-                    'Weekly progress reports',
-                  ].map((label, i) => (
-                    <div key={i} className="flex items-center justify-between py-2 border-b border-ink-100 dark:border-white/[0.06] last:border-0">
-                      <span className="text-sm text-ink-700 dark:text-ink-300">{label}</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" defaultChecked={i < 2} className="sr-only peer" />
-                        <div className="w-10 h-5 bg-ink-200 dark:bg-white/10 rounded-full peer peer-checked:bg-brand-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
-                      </label>
-                    </div>
-                  ))}
+                  <div className="flex items-center justify-between py-2 border-b border-ink-100 dark:border-white/[0.06]">
+                    <span className="text-sm text-ink-700 dark:text-ink-300">Notification emails</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={notifEmails}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setNotifEmails(checked);
+                          void persistPreference({ notificationEmailsEnabled: checked });
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-ink-200 dark:bg-white/10 rounded-full peer peer-checked:bg-brand-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
+                    </label>
+                  </div>
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm text-ink-700 dark:text-ink-300">Marketing emails</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={marketingEmails}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setMarketingEmails(checked);
+                          void persistPreference({ marketingEmailsEnabled: checked });
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-ink-200 dark:bg-white/10 rounded-full peer peer-checked:bg-brand-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
+                    </label>
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>

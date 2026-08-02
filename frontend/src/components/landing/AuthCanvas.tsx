@@ -79,7 +79,7 @@ export function AuthCanvas({ className = '' }: AuthCanvasProps) {
         else ctx.lineTo(hx, hy);
       }
       ctx.closePath();
-      ctx.strokeStyle = `rgba(139, 92, 246, ${alpha})`;
+      ctx.strokeStyle = `rgba(6, 182, 212, ${alpha})`;
       ctx.lineWidth = 1;
       ctx.stroke();
       ctx.restore();
@@ -104,8 +104,8 @@ export function AuthCanvas({ className = '' }: AuthCanvasProps) {
       const aura1X = width * 0.35 + normMouseX * 90;
       const aura1Y = height * 0.4 + normMouseY * 70;
       const aura1 = ctx.createRadialGradient(aura1X, aura1Y, 10, aura1X, aura1Y, Math.max(width, height) * 0.55);
-      aura1.addColorStop(0, 'rgba(139, 92, 246, 0.28)');
-      aura1.addColorStop(0.4, 'rgba(99, 102, 241, 0.12)');
+      aura1.addColorStop(0, 'rgba(6, 182, 212, 0.28)');
+      aura1.addColorStop(0.4, 'rgba(20, 184, 166, 0.12)');
       aura1.addColorStop(0.8, 'rgba(236, 72, 153, 0.04)');
       aura1.addColorStop(1, 'transparent');
       ctx.fillStyle = aura1;
@@ -115,7 +115,7 @@ export function AuthCanvas({ className = '' }: AuthCanvasProps) {
       const aura2Y = height * 0.65 + Math.cos(time * 0.3) * 40;
       const aura2 = ctx.createRadialGradient(aura2X, aura2Y, 10, aura2X, aura2Y, Math.max(width, height) * 0.45);
       aura2.addColorStop(0, 'rgba(6, 182, 212, 0.2)');
-      aura2.addColorStop(0.5, 'rgba(99, 102, 241, 0.08)');
+      aura2.addColorStop(0.5, 'rgba(20, 184, 166, 0.08)');
       aura2.addColorStop(1, 'transparent');
       ctx.fillStyle = aura2;
       ctx.fillRect(0, 0, width, height);
@@ -131,7 +131,7 @@ export function AuthCanvas({ className = '' }: AuthCanvasProps) {
       ctx.rotate(time * 0.2);
       ctx.beginPath();
       ctx.arc(0, 0, 240, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(139, 92, 246, 0.12)';
+      ctx.strokeStyle = 'rgba(6, 182, 212, 0.12)';
       ctx.lineWidth = 1.5;
       ctx.setLineDash([20, 15, 5, 15]);
       ctx.stroke();
@@ -178,7 +178,7 @@ export function AuthCanvas({ className = '' }: AuthCanvasProps) {
         ctx.arc(n.x, n.y, Math.max(0.5, currentRadius), 0, Math.PI * 2);
         ctx.fillStyle = `rgba(224, 231, 255, ${n.alpha})`;
         ctx.shadowBlur = 10;
-        ctx.shadowColor = 'rgba(139, 92, 246, 0.7)';
+        ctx.shadowColor = 'rgba(6, 182, 212, 0.7)';
         ctx.fill();
         ctx.shadowBlur = 0;
 
@@ -194,7 +194,7 @@ export function AuthCanvas({ className = '' }: AuthCanvasProps) {
             ctx.beginPath();
             ctx.moveTo(n.x, n.y);
             ctx.lineTo(n2.x, n2.y);
-            ctx.strokeStyle = `rgba(139, 92, 246, ${alpha})`;
+            ctx.strokeStyle = `rgba(6, 182, 212, ${alpha})`;
             ctx.lineWidth = 0.8;
             ctx.stroke();
           }

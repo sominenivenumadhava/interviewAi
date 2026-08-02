@@ -114,7 +114,7 @@ export function HeroCanvas({ className = '', theme = 'dark' }: HeroCanvasProps) 
       );
       bgGlow.addColorStop(0, 'rgba(91, 93, 254, 0.25)');
       bgGlow.addColorStop(0.3, 'rgba(62, 69, 255, 0.14)');
-      bgGlow.addColorStop(0.6, 'rgba(139, 92, 246, 0.08)');
+      bgGlow.addColorStop(0.6, 'rgba(6, 182, 212, 0.08)');
       bgGlow.addColorStop(1, '#04060A');
       ctx.fillStyle = bgGlow;
       ctx.fillRect(0, 0, width, height);
@@ -124,7 +124,7 @@ export function HeroCanvas({ className = '', theme = 'dark' }: HeroCanvasProps) 
       const glow1Y = height * 0.25 + Math.cos(time * 0.3) * (height * 0.15);
       const accentGlow1 = ctx.createRadialGradient(glow1X, glow1Y, 10, glow1X, glow1Y, width * 0.35);
       accentGlow1.addColorStop(0, 'rgba(6, 182, 212, 0.22)');
-      accentGlow1.addColorStop(0.6, 'rgba(99, 102, 241, 0.08)');
+      accentGlow1.addColorStop(0.6, 'rgba(20, 184, 166, 0.08)');
       accentGlow1.addColorStop(1, 'transparent');
       ctx.fillStyle = accentGlow1;
       ctx.fillRect(0, 0, width, height);
@@ -132,7 +132,7 @@ export function HeroCanvas({ className = '', theme = 'dark' }: HeroCanvasProps) 
       const glow2X = width * 0.7 + Math.cos(time * 0.35) * (width * 0.2);
       const glow2Y = height * 0.75 + Math.sin(time * 0.45) * (height * 0.15);
       const accentGlow2 = ctx.createRadialGradient(glow2X, glow2Y, 10, glow2X, glow2Y, width * 0.4);
-      accentGlow2.addColorStop(0, 'rgba(139, 92, 246, 0.18)');
+      accentGlow2.addColorStop(0, 'rgba(6, 182, 212, 0.18)');
       accentGlow2.addColorStop(0.5, 'rgba(62, 69, 255, 0.06)');
       accentGlow2.addColorStop(1, 'transparent');
       ctx.fillStyle = accentGlow2;
@@ -140,7 +140,7 @@ export function HeroCanvas({ className = '', theme = 'dark' }: HeroCanvasProps) 
 
       // ── Layer 5: Perspective Grid Line Horizon ──
       ctx.save();
-      ctx.strokeStyle = 'rgba(99, 102, 241, 0.04)';
+      ctx.strokeStyle = 'rgba(20, 184, 166, 0.04)';
       ctx.lineWidth = 1;
       gridOffset = (gridOffset + 0.35) % 40;
       const horizonY = height * 0.55;
@@ -179,7 +179,7 @@ export function HeroCanvas({ className = '', theme = 'dark' }: HeroCanvasProps) 
         ctx.arc(p.x, p.y, Math.max(0.5, currentRadius), 0, Math.PI * 2);
         ctx.fillStyle = `rgba(165, 180, 252, ${p.alpha * 0.8})`;
         ctx.shadowBlur = 8;
-        ctx.shadowColor = 'rgba(99, 102, 241, 0.6)';
+        ctx.shadowColor = 'rgba(20, 184, 166, 0.6)';
         ctx.fill();
         ctx.shadowBlur = 0;
 
@@ -195,7 +195,7 @@ export function HeroCanvas({ className = '', theme = 'dark' }: HeroCanvasProps) 
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
             ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = `rgba(99, 102, 241, ${lineAlpha})`;
+            ctx.strokeStyle = `rgba(20, 184, 166, ${lineAlpha})`;
             ctx.lineWidth = 0.8;
             ctx.stroke();
           }
@@ -229,7 +229,7 @@ export function HeroCanvas({ className = '', theme = 'dark' }: HeroCanvasProps) 
       ctx.rotate(-time * 0.3);
       ctx.beginPath();
       ctx.ellipse(0, 0, sphereRadius * 1.3, sphereRadius * 0.6, -time * 0.4, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(139, 92, 246, 0.3)';
+      ctx.strokeStyle = 'rgba(6, 182, 212, 0.3)';
       ctx.lineWidth = 1.2;
       ctx.stroke();
       ctx.restore();
@@ -237,7 +237,7 @@ export function HeroCanvas({ className = '', theme = 'dark' }: HeroCanvasProps) 
       // Core Inner Radial Glow
       const coreGlow = ctx.createRadialGradient(0, 0, 5, 0, 0, sphereRadius * 1.1);
       coreGlow.addColorStop(0, 'rgba(129, 140, 248, 0.8)');
-      coreGlow.addColorStop(0.3, 'rgba(99, 102, 241, 0.4)');
+      coreGlow.addColorStop(0.3, 'rgba(20, 184, 166, 0.4)');
       coreGlow.addColorStop(0.7, 'rgba(62, 69, 255, 0.12)');
       coreGlow.addColorStop(1, 'transparent');
       ctx.fillStyle = coreGlow;
@@ -282,7 +282,7 @@ export function HeroCanvas({ className = '', theme = 'dark' }: HeroCanvasProps) 
         ctx.arc(pt.px, pt.py, pointRadius, 0, Math.PI * 2);
         ctx.fillStyle = pt.z > 0
           ? `rgba(224, 231, 255, ${depthAlpha * 0.95})`
-          : `rgba(99, 102, 241, ${depthAlpha * 0.6})`;
+          : `rgba(20, 184, 166, ${depthAlpha * 0.6})`;
 
         if (pt.z > sphereRadius * 0.3) {
           ctx.shadowBlur = 10;

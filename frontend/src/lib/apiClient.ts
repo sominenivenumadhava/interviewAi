@@ -84,11 +84,15 @@ class ApiClient {
       }
     }
 
-    // Build headers
+    // Build headers — omit Content-Type for FormData so browser sets multipart boundary
+    const isFormData = typeof FormData !== 'undefined' && fetchConfig.body instanceof FormData;
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(fetchConfig.headers as Record<string, string>),
     };
+    if (isFormData) {
+      delete headers['Content-Type'];
+    }
 
     // Attach JWT if available and not skipped
     if (!skipAuth) {
@@ -170,7 +174,13 @@ class ApiClient {
 
           errorDetails = errorData;
         } catch {
-          errorMessage = response.statusText || errorMessage;
+          // Vite proxy often returns bare 500/502 with statusText when Spring is down
+          if (response.status >= 500) {
+            errorMessage =
+              'Cannot reach the API server. Start the Spring Boot backend on port 8082 and try again.';
+          } else {
+            errorMessage = response.statusText || errorMessage;
+          }
           console.debug('[ApiClient]   (Could not parse error response as JSON)');
         }
 
@@ -252,17 +262,19 @@ class ApiClient {
   }
 
   async post<T = any>(endpoint: string, data?: any, config?: RequestConfig): Promise<ApiResponse<T>> {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
     return this.request<T>(endpoint, {
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
+      body: data == null ? undefined : isFormData ? data : JSON.stringify(data),
       ...config,
     });
   }
 
   async put<T = any>(endpoint: string, data?: any, config?: RequestConfig): Promise<ApiResponse<T>> {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
     return this.request<T>(endpoint, {
       method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined,
+      body: data == null ? undefined : isFormData ? data : JSON.stringify(data),
       ...config,
     });
   }
@@ -433,6 +445,7 @@ export const API_ENDPOINTS = {
     GET: (id: string) => `/api/v1/resumes/${id}`,
     UPDATE: (id: string) => `/api/v1/resumes/${id}`,
     DELETE: (id: string) => `/api/v1/resumes/${id}`,
+    PRIMARY: (id: string) => `/api/v1/resumes/${id}/primary`,
     SET_PRIMARY: (id: string) => `/api/v1/resumes/${id}/set-primary`,
     DOWNLOAD: (id: string) => `/api/v1/resumes/${id}/download`,
   },

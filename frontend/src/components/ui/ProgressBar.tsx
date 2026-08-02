@@ -19,7 +19,7 @@ const colorMap: Record<string, string> = {
   amber:   'bg-amber-500',
   rose:    'bg-rose-500',
   cyan:    'bg-cyan-500',
-  violet:  'bg-violet-500',
+  violet:  'bg-cyan-500',
 };
 
 const sizeMap: Record<string, string> = {

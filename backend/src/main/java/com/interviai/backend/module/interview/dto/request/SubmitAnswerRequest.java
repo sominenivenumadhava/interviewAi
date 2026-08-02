@@ -24,4 +24,10 @@ public class SubmitAnswerRequest {
     private String answerVideoUrl;
     
     private Long timeTakenSeconds;
+
+    /** Optional client-side score (0–100). Persisted when provided. */
+    private Double score;
+
+    /** Optional feedback accompanying a client-provided score. */
+    private String feedback;
 }

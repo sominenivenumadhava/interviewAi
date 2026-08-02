@@ -54,7 +54,7 @@ export function Login() {
             <motion.div variants={fadeUp} className="flex flex-col items-center mb-8 text-center">
               <Link to="/">
                 <motion.div
-                  className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-indigo-600 to-violet-600 shadow-glow-indigo mb-4 cursor-pointer"
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-teal-500 to-cyan-500 shadow-glow-indigo mb-4 cursor-pointer"
                   whileHover={{ scale: 1.08, rotate: 5 }}
                   transition={{ type: 'spring', stiffness: 300 }}
                 >

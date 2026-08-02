@@ -325,6 +325,24 @@ export function Room() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  /** EVALUATE_ALL then COMPLETE — used by finish paths */
+  const completeInterview = async () => {
+    if (sessionId) {
+      try {
+        await apiClient.post(API_ENDPOINTS.INTERVIEW.EVALUATE_ALL(sessionId));
+      } catch (e) {
+        console.warn('Failed to evaluate all answers:', e);
+      }
+      try {
+        await apiClient.post(API_ENDPOINTS.INTERVIEW.COMPLETE(sessionId));
+      } catch (e) {
+        console.warn('Failed to call complete interview endpoint:', e);
+      }
+    }
+    endSessionState();
+    navigate('/evaluation');
+  };
+
   // Submit Answer & Move to Next Question
   const handleSubmitAnswer = async () => {
     // React state updates are asynchronous, so a rapid second click can arrive
@@ -361,18 +379,21 @@ export function Room() {
         throw new Error('Answer validation did not return a score.');
       }
 
-      await apiClient.post<any>(API_ENDPOINTS.INTERVIEW.SUBMIT_ANSWER, {
-        sessionId,
-        questionOrder: currentQIndex,
-        answerText: answer
-      });
-
-      // Use the result returned by this validation request. Reading
-      // validationResult here used stale React state and always fell back to 8.5.
+      // Compute score before submit so we can persist it with the answer
       const rawScore = Number(submittedValidation.score);
       const currentScoreVal = Number.isFinite(rawScore)
         ? Math.max(0, Math.min(100, rawScore * 10))
         : 0;
+      const feedbackText = submittedValidation.feedback || 'Good response.';
+
+      await apiClient.post<any>(API_ENDPOINTS.INTERVIEW.SUBMIT_ANSWER, {
+        sessionId,
+        questionOrder: currentQIndex,
+        answerText: answer,
+        score: currentScoreVal,
+        feedback: feedbackText,
+      });
+
       const newScores = [...scoreHistory, currentScoreVal];
       setScoreHistory(newScores);
       const avgScore = Math.round(newScores.reduce((a, b) => a + b, 0) / newScores.length);
@@ -391,22 +412,14 @@ export function Room() {
         weakSkillsDetected: submittedValidation.missingPoints || [],
         lastEvaluation: {
           score: currentScoreVal,
-          feedback: submittedValidation.feedback || 'Good response.',
+          feedback: feedbackText,
           expectedAnswer: submittedValidation.idealAnswer || 'Ideal answer overview.'
         }
       });
 
       const totalQ = selectedConfig.numberOfQuestions || 5;
       if (currentQIndex >= totalQ) {
-        try {
-          if (sessionId) {
-            await apiClient.post(API_ENDPOINTS.INTERVIEW.COMPLETE(sessionId));
-          }
-        } catch (e) {
-          console.warn('Failed to call complete interview endpoint:', e);
-        }
-        endSessionState();
-        navigate('/evaluation');
+        await completeInterview();
         return;
       }
 
@@ -548,15 +561,7 @@ export function Room() {
           className="gap-2 shadow"
           onClick={async () => {
             if (isRecording) stopRecording();
-            if (sessionId) {
-              try {
-                await apiClient.post(API_ENDPOINTS.INTERVIEW.COMPLETE(sessionId));
-              } catch (e) {
-                console.warn('Failed to call complete interview endpoint:', e);
-              }
-            }
-            endSessionState();
-            navigate('/evaluation');
+            await completeInterview();
           }}
         >
           <PhoneOff size={16} />

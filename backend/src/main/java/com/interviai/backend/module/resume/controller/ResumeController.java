@@ -40,7 +40,7 @@ import java.util.UUID;
  * @since 1.0.0
  */
 @RestController
-@RequestMapping("/api/resumes")
+@RequestMapping("/api/v1/resumes")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Resume Management", description = "APIs for resume upload, processing, and management")
@@ -219,7 +219,7 @@ public class ResumeController {
             description = "Resume not found"
         )
     })
-    @PutMapping("/{resumeId}/primary")
+    @PutMapping({"/{resumeId}/primary", "/{resumeId}/set-primary"})
     public ResponseEntity<ApiResponse<ResumeResponse>> setPrimaryResume(
             @AuthenticationPrincipal UserDetails userDetails,
             @Parameter(description = "Resume ID", required = true)

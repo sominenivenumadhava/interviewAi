@@ -17,12 +17,13 @@ import apiClient, { API_ENDPOINTS } from '../lib/apiClient';
 
 // ─── Consistent chart colors ───────────────────────────────────────────────────
 const C = {
-  indigo:  '#6366f1',
+  teal:    '#14b8a6',
   cyan:    '#06b6d4',
   emerald: '#10b981',
   amber:   '#f59e0b',
   rose:    '#f43f5e',
-  violet:  '#8b5cf6',
+  indigo:  '#14b8a6', // alias
+  violet:  '#06b6d4', // alias
 };
 
 const tooltipStyle = {
@@ -70,7 +71,7 @@ export function Analytics() {
   const skillMetrics = data?.skillMetrics;
   const recentHist   = data?.recentInterviews ?? [];
 
-  const overallScore   = overview?.averageScore ? Math.round(overview.averageScore) : 85;
+  const overallScore   = overview?.averageScore ? Math.round(overview.averageScore) : 0;
   const totalCount     = overview?.totalInterviews ?? recentHist.length ?? 0;
   const completedCount = overview?.completedInterviews ?? totalCount;
   const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
@@ -202,9 +203,9 @@ export function Analytics() {
               title="Readiness"
               value={readinessTier}
               icon={<Target size={20} />}
-              iconColor="bg-violet-500/10"
-              iconTextColor="text-violet-500"
-              accentColor="border-l-violet-500"
+              iconColor="bg-cyan-500/10"
+              iconTextColor="text-cyan-500"
+              accentColor="border-l-cyan-500"
               animate={false}
             />
           </motion.div>

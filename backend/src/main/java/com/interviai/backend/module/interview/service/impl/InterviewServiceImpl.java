@@ -267,12 +267,17 @@ public class InterviewServiceImpl implements InterviewService {
         if (interview.getStatus() != InterviewStatus.IN_PROGRESS) {
             throw new BusinessException("Interview must be in progress to complete");
         }
-        
-        // Calculate overall score
-        Double averageScore = answerRepository.getAverageScoreByInterview(interview);
-        if (averageScore != null) {
-            interview.setOverallScore(averageScore);
+
+        // Ensure answers are evaluated before averaging
+        try {
+            questionService.evaluateAllAnswers(sessionId, userId);
+        } catch (Exception e) {
+            log.warn("evaluateAllAnswers failed for session {}: {}", sessionId, e.getMessage());
         }
+        
+        // Calculate overall score (default 0.0 when none available)
+        Double averageScore = answerRepository.getAverageScoreByInterview(interview);
+        interview.setOverallScore(averageScore != null ? averageScore : 0.0);
         
         // Generate overall feedback
         generateOverallFeedback(interview);

@@ -23,7 +23,7 @@ export function Badge({ className, variant = 'default', pulse = false, ...props 
     info:
       'border-cyan-500/30 bg-cyan-500/15 text-cyan-300',
     premium:
-      'border-brand-500/30 bg-gradient-to-r from-brand-500/20 to-violet-500/20 text-brand-300',
+      'border-brand-500/30 bg-gradient-to-r from-brand-500/20 to-cyan-500/20 text-brand-300',
   };
 
   return (

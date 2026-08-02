@@ -356,25 +356,10 @@ export const useAuth = (): AuthContextType => {
   return context;
 };
 
-// Hook for protected routes
+/** Hook for protected routes. Prefer rendering <Navigate> in layout; this only exposes auth state. */
 export const useRequireAuth = (requiredRole?: 'USER' | 'MODERATOR' | 'ADMIN') => {
   const auth = useAuth();
-  
-  useEffect(() => {
-    if (!auth.isLoading) {
-      if (!auth.isAuthenticated) {
-        // Redirect to login page
-        window.location.href = '/login';
-        return;
-      }
-      
-      if (requiredRole && !auth.hasRole(requiredRole)) {
-        // Redirect to unauthorized page or home
-        window.location.href = '/';
-        return;
-      }
-    }
-  }, [auth.isLoading, auth.isAuthenticated, auth.hasRole, requiredRole]);
-  
+  // Role checks are enforced by calling components (e.g. Admin) via hasRole + Navigate.
+  void requiredRole;
   return auth;
 };

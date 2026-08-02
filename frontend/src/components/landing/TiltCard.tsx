@@ -52,7 +52,7 @@ export function TiltCard({ children, className = '' }: TiltCardProps) {
       <div
         className="absolute inset-0 rounded-3xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
         style={{
-          background: `radial-gradient(300px circle at ${lightPos.x}% ${lightPos.y}%, rgba(99, 102, 241, 0.15), transparent 80%)`,
+          background: `radial-gradient(300px circle at ${lightPos.x}% ${lightPos.y}%, rgba(20, 184, 166, 0.15), transparent 80%)`,
         }}
       />
       {children}

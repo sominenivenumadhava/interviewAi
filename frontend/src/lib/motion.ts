@@ -26,25 +26,21 @@ export const spring = {
 export const pageVariants: Variants = {
   initial: {
     opacity: 0,
-    y: 20,
-    filter: 'blur(4px)',
+    y: 12,
   },
   animate: {
     opacity: 1,
     y: 0,
-    filter: 'blur(0px)',
     transition: {
-      duration: 0.5,
+      duration: 0.28,
       ease: ease.out,
     },
   },
   exit: {
     opacity: 0,
-    y: -10,
-    scale: 0.98,
-    filter: 'blur(4px)',
+    y: -6,
     transition: {
-      duration: 0.3,
+      duration: 0.18,
       ease: ease.in,
     },
   },
@@ -144,7 +140,7 @@ export const cardHover = {
   hover: {
     y: -4,
     scale: 1.01,
-    boxShadow: '0 20px 40px rgba(99,102,241,0.2)',
+    boxShadow: '0 20px 40px rgba(20,184,166,0.2)',
     transition: spring.snappy,
   },
   tap: {

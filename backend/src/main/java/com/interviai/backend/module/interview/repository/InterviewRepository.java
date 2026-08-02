@@ -54,7 +54,8 @@ public interface InterviewRepository extends JpaRepository<Interview, UUID> {
     @Query("SELECT i FROM Interview i LEFT JOIN FETCH i.questions WHERE i.sessionId = :sessionId")
     Optional<Interview> findBySessionIdWithQuestions(@Param("sessionId") String sessionId);
     
-    @Query("SELECT i FROM Interview i LEFT JOIN FETCH i.questions LEFT JOIN FETCH i.answers WHERE i.sessionId = :sessionId")
+    // Single JOIN FETCH only — dual bag fetch causes MultipleBagFetchException
+    @Query("SELECT i FROM Interview i LEFT JOIN FETCH i.questions WHERE i.sessionId = :sessionId")
     Optional<Interview> findBySessionIdWithQuestionsAndAnswers(@Param("sessionId") String sessionId);
     
     @Query("SELECT DISTINCT i.role FROM Interview i WHERE i.user = :user ORDER BY i.role")

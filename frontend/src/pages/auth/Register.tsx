@@ -200,7 +200,7 @@ export function Register() {
           >
             Redirecting you to the login page…
           </motion.p>
-          <Loader2 size={20} className="animate-spin text-neon-indigo mx-auto" />
+          <Loader2 size={20} className="animate-spin text-neon-cyan mx-auto" />
         </motion.div>
       </div>
     );
@@ -228,7 +228,7 @@ export function Register() {
             <motion.div variants={fadeUp} className="flex flex-col items-center mb-8 text-center">
               <Link to="/">
                 <motion.div
-                  className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-indigo-600 to-violet-600 shadow-glow-indigo mb-4 cursor-pointer"
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-teal-500 to-cyan-500 shadow-glow-indigo mb-4 cursor-pointer"
                   whileHover={{ scale: 1.08, rotate: 5 }}
                   transition={{ type: 'spring', stiffness: 300 }}
                 >
@@ -388,7 +388,7 @@ export function Register() {
                         checked={formData[name as keyof FormData] as boolean}
                         onChange={handleChange}
                         disabled={isLoading}
-                        className="h-4 w-4 mt-0.5 rounded border-white/20 bg-obsidian-900 text-neon-indigo focus:ring-neon-indigo accent-indigo-500"
+                        className="h-4 w-4 mt-0.5 rounded border-white/20 bg-obsidian-900 text-neon-cyan focus:ring-neon-cyan accent-teal-500"
                       />
                       <label htmlFor={name} className="text-sm text-ink-300 cursor-pointer">
                         I agree to the{' '}

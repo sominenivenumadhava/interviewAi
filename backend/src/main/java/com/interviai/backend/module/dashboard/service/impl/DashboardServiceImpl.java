@@ -15,6 +15,7 @@ import com.interviai.backend.module.user.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -180,21 +181,21 @@ public class DashboardServiceImpl implements DashboardService {
                     }
                 }
             } else {
-                overview.setCurrentScore(85.0);
+                overview.setCurrentScore(0.0);
             }
             
             // Average score
             double avgScore = sorted.stream()
-                    .mapToDouble(i -> i.getOverallScore() != null ? i.getOverallScore() : 85.0)
+                    .mapToDouble(i -> i.getOverallScore() != null ? i.getOverallScore() : 0.0)
                     .average()
-                    .orElse(85.0);
+                    .orElse(0.0);
             overview.setAverageScore(avgScore);
             
             // Best score
             sorted.stream()
-                    .max(Comparator.comparing(i -> i.getOverallScore() != null ? i.getOverallScore() : 85.0))
+                    .max(Comparator.comparing(i -> i.getOverallScore() != null ? i.getOverallScore() : 0.0))
                     .ifPresent(best -> {
-                        overview.setBestScore(best.getOverallScore() != null ? best.getOverallScore() : 85.0);
+                        overview.setBestScore(best.getOverallScore() != null ? best.getOverallScore() : 0.0);
                         overview.setBestScoreRole(best.getRole());
                     });
             
@@ -218,7 +219,7 @@ public class DashboardServiceImpl implements DashboardService {
             DashboardResponse.RecentActivity activity = new DashboardResponse.RecentActivity();
             activity.setType("INTERVIEW_COMPLETED");
             activity.setTitle("Completed " + interview.getRole() + " interview");
-            double score = interview.getOverallScore() != null ? interview.getOverallScore() : 85.0;
+            double score = interview.getOverallScore() != null ? interview.getOverallScore() : 0.0;
             activity.setDescription(String.format("Score: %.1f%% | %s difficulty", 
                     score, interview.getDifficultyLevel()));
             activity.setTimestamp(interview.getCompletedAt() != null ? interview.getCompletedAt() : interview.getCreatedAt());
@@ -274,7 +275,7 @@ public class DashboardServiceImpl implements DashboardService {
         
         // Gather all completed interviews and their answers
         List<Interview> completedInterviews = interviewRepository.findByUserAndStatus(
-                user, InterviewStatus.COMPLETED, null).getContent();
+                user, InterviewStatus.COMPLETED, Pageable.unpaged()).getContent();
         
         // Group answer scores by question category
         Map<String, List<Double>> scoresByCategory = new HashMap<>();
@@ -453,7 +454,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .collect(Collectors.groupingBy(
                         i -> (i.getCompletedAt() != null ? i.getCompletedAt() : i.getCreatedAt()).toLocalDate(),
                         TreeMap::new,
-                        Collectors.mapping(i -> i.getOverallScore() != null ? i.getOverallScore() : 85.0, Collectors.toList())
+                        Collectors.mapping(i -> i.getOverallScore() != null ? i.getOverallScore() : 0.0, Collectors.toList())
                 ));
         
         return scoresByDate.entrySet().stream()
@@ -463,7 +464,7 @@ public class DashboardServiceImpl implements DashboardService {
                     trend.setScore(entry.getValue().stream()
                             .mapToDouble(Double::doubleValue)
                             .average()
-                            .orElse(85.0));
+                            .orElse(0.0));
                     trend.setLabel(entry.getKey().format(DateTimeFormatter.ofPattern("MMM d")));
                     return trend;
                 })

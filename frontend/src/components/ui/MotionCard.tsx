@@ -78,7 +78,7 @@ export function MotionCard({
       <div
         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
         style={{
-          background: 'radial-gradient(circle at top left, rgba(99,102,241,0.04), transparent 60%)',
+          background: 'radial-gradient(circle at top left, rgba(20,184,166,0.04), transparent 60%)',
         }}
       />
 

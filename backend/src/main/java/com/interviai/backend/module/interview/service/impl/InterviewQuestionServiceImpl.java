@@ -183,6 +183,15 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
         if (request.getTimeTakenSeconds() != null) {
             answer.setTimeTaken(Duration.ofSeconds(request.getTimeTakenSeconds()));
         }
+
+        if (request.getScore() != null) {
+            double clamped = Math.max(0.0, Math.min(100.0, request.getScore()));
+            answer.setScore(clamped);
+            answer.setRating(ratingFromScore(clamped));
+            if (request.getFeedback() != null) {
+                answer.setFeedback(request.getFeedback());
+            }
+        }
         
         InterviewAnswer savedAnswer = answerRepository.save(answer);
         
@@ -215,8 +224,8 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
                 criteria
             ).block();
             
-            // Parse evaluation result
-            Map<String, Object> evaluation = objectMapper.readValue(evaluationJson, Map.class);
+            // Parse evaluation result (extract JSON object from AI prose if needed)
+            Map<String, Object> evaluation = objectMapper.readValue(extractJsonObject(evaluationJson), Map.class);
             
             // Update answer with evaluation
             answer.setScore(((Number) evaluation.get("score")).doubleValue());
@@ -246,15 +255,15 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
             return interviewMapper.toAnswerResponse(savedAnswer);
             
         } catch (Exception e) {
-            log.warn("Error evaluating answer for question {}: {}. Generating fallback evaluation.", questionOrder, e.getMessage());
-            answer.setScore(80.0);
-            answer.setRating("GOOD");
-            answer.setStrengths(List.of("Clear and structured explanation", "Directly addressed the question topic"));
-            answer.setImprovements(List.of("Provide more concrete examples from past projects", "Elaborate further on trade-offs and edge cases"));
-            answer.setFeedback("Good response. To make your answer stand out, include specific technical details and measurable outcomes.");
-            answer.setSuggestedAnswer("Structure your response using the STAR method (Situation, Task, Action, Result) and highlight key technical decisions.");
-            answer.setAiEvaluation("{}");
-            
+            log.warn("Error evaluating answer for question {}: {}. Keeping existing score or marking UNEVALUATED.", questionOrder, e.getMessage());
+            // Do NOT fabricate a fake score — keep existing or set 0 / UNEVALUATED
+            if (answer.getScore() == null) {
+                answer.setScore(0.0);
+                answer.setRating("UNEVALUATED");
+            }
+            if (answer.getFeedback() == null) {
+                answer.setFeedback("Evaluation unavailable. Please retry later.");
+            }
             InterviewAnswer savedAnswer = answerRepository.save(answer);
             return interviewMapper.toAnswerResponse(savedAnswer);
         }
@@ -414,6 +423,15 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
             throw new BusinessException("AI response did not contain valid JSON");
         }
         return response.substring(start, end + 1);
+    }
+
+    private String ratingFromScore(double score) {
+        if (score >= 90) return "EXCELLENT";
+        if (score >= 80) return "VERY_GOOD";
+        if (score >= 70) return "GOOD";
+        if (score >= 60) return "SATISFACTORY";
+        if (score >= 50) return "NEEDS_IMPROVEMENT";
+        return "POOR";
     }
     
     private InterviewQuestion createQuestionFromData(Interview interview, Map<String, Object> data, int order) {

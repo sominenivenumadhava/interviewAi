@@ -2,12 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useInView, animate } from 'framer-motion';
 import gsap from 'gsap';
-import Lenis from 'lenis';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   BrainCircuit, ArrowRight, BarChart3, Target, Shield,
   Sparkles, Zap, TrendingUp, CheckCircle2, ChevronDown,
-  Sun, Moon
+  Sun, Moon, RotateCcw
 } from 'lucide-react';
 
 import { HeroCanvas } from '../components/landing/HeroCanvas';
@@ -54,8 +53,19 @@ function FlipCard({ icon: Icon, title, desc, details }: FlipCardProps) {
     <div
       className="group relative h-80 cursor-pointer"
       style={{ perspective: '1200px' }}
+      role="button"
+      tabIndex={0}
+      aria-pressed={flipped}
+      aria-label={`${title}. ${flipped ? 'Showing details' : 'Activate to flip'}`}
       onMouseEnter={() => setFlipped(true)}
       onMouseLeave={() => setFlipped(false)}
+      onClick={() => setFlipped((v) => !v)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setFlipped((v) => !v);
+        }
+      }}
     >
       <motion.div
         className="relative w-full h-full"
@@ -71,10 +81,10 @@ function FlipCard({ icon: Icon, title, desc, details }: FlipCardProps) {
           {/* Hover shimmer */}
           <div
             className="absolute inset-0 rounded-3xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-            style={{ background: 'radial-gradient(300px circle at 60% 40%, rgba(99,102,241,0.12), transparent 70%)' }}
+            style={{ background: 'radial-gradient(300px circle at 60% 40%, rgba(20,184,166,0.12), transparent 70%)' }}
           />
           <div>
-            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500/10 to-violet-500/10 dark:from-brand-500/20 dark:to-violet-500/20 border border-brand-500/20 dark:border-white/15 text-brand-600 dark:text-neon-cyan shadow-glow-sm">
+            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500/10 to-cyan-500/10 dark:from-brand-500/20 dark:to-cyan-500/20 border border-brand-500/20 dark:border-white/15 text-brand-600 dark:text-neon-cyan shadow-glow-sm">
               <Icon size={26} />
             </div>
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">{title}</h3>
@@ -82,13 +92,13 @@ function FlipCard({ icon: Icon, title, desc, details }: FlipCardProps) {
           </div>
           <div className="flex items-center gap-1.5 text-xs font-semibold text-brand-500 dark:text-brand-400 mt-4 opacity-60">
             <RotateCcw size={12} />
-            <span>Hover to explore</span>
+            <span>Hover or tap to explore</span>
           </div>
         </div>
 
         {/* ── Back Face ── */}
         <div
-          className="absolute inset-0 rounded-3xl border border-brand-500/30 dark:border-brand-400/30 bg-gradient-to-br from-brand-600 via-indigo-700 to-violet-700 dark:from-brand-800/90 dark:via-indigo-900/90 dark:to-violet-900/90 backdrop-blur-xl p-8 flex flex-col justify-between shadow-glow-indigo"
+          className="absolute inset-0 rounded-3xl border border-brand-500/30 dark:border-brand-400/30 bg-gradient-to-br from-brand-600 via-teal-700 to-cyan-700 dark:from-brand-800/90 dark:via-teal-900/90 dark:to-cyan-900/90 backdrop-blur-xl p-8 flex flex-col justify-between shadow-glow-indigo"
           style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
         >
           {/* Grain overlay */}
@@ -125,33 +135,18 @@ export function Landing() {
   const heroRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLElement>(null);
 
-  // Initialize Lenis Smooth Scroll & GSAP Entrance Timeline
+  // GSAP entrance timeline (Lenis is handled globally in App)
   useEffect(() => {
-    const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smoothWheel: true,
-    });
-
-    function raf(time: number) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
-    }
-    requestAnimationFrame(raf);
-
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: 'power3.out', duration: 1.1 } });
       tl.from('.gsap-nav', { y: -30, opacity: 0, delay: 0.2 })
-        .from('.gsap-badge', { y: 20, opacity: 0 }, '-=0.6')
-        .from('.gsap-title', { y: 35, opacity: 0, duration: 1.3 }, '-=0.8')
+        .from('.gsap-title', { y: 35, opacity: 0, duration: 1.3 }, '-=0.6')
         .from('.gsap-desc', { y: 25, opacity: 0 }, '-=0.9')
         .from('.gsap-cta', { y: 20, opacity: 0, stagger: 0.15 }, '-=0.8')
-        .from('.gsap-stats', { y: 30, opacity: 0 }, '-=0.6')
         .from('.gsap-scroll', { opacity: 0 }, '-=0.4');
     }, heroRef);
 
     return () => {
-      lenis.destroy();
       ctx.revert();
     };
   }, []);
@@ -282,7 +277,7 @@ export function Landing() {
         >
           <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 lg:px-8">
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-indigo-600 to-violet-600 shadow-glow-indigo group-hover:scale-105 transition-transform duration-300">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-teal-500 to-cyan-500 shadow-glow-indigo group-hover:scale-105 transition-transform duration-300">
                 <BrainCircuit size={22} className="text-white" />
               </div>
               <span className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white group-hover:text-brand-500 transition-colors">
@@ -300,65 +295,39 @@ export function Landing() {
               >
                 {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} className="text-slate-800" />}
               </motion.button>
-              <Link to="/login">
-                <span className="text-sm font-semibold text-slate-600 hover:text-slate-900 dark:text-ink-300 dark:hover:text-white transition-colors cursor-pointer">
-                  Log in
-                </span>
+              <Link
+                to="/login"
+                className="relative z-50 text-sm font-semibold text-slate-600 hover:text-slate-900 dark:text-ink-300 dark:hover:text-white transition-colors"
+              >
+                Log in
               </Link>
-              <Link to="/register">
-                <MagneticButton variant="primary" className="text-sm px-6 py-2.5">
-                  Get Started <ArrowRight size={16} />
-                </MagneticButton>
-              </Link>
+              <MagneticButton to="/register" variant="primary" className="text-sm px-6 py-2.5">
+                Get Started <ArrowRight size={16} />
+              </MagneticButton>
             </div>
           </div>
         </nav>
 
         {/* ── Hero Section ── */}
-        <section className="relative z-20 pt-20 pb-32 px-6 text-center max-w-6xl mx-auto flex flex-col items-center">
+        <section className="relative z-20 min-h-[calc(100vh-5rem)] pt-24 pb-20 px-6 text-center max-w-6xl mx-auto flex flex-col items-center justify-center">
 
-          <div className="gsap-badge mb-8">
-            <div className="inline-flex items-center gap-2.5 rounded-full border border-brand-500/30 bg-brand-500/10 px-5 py-2 text-xs font-semibold tracking-wider text-brand-600 dark:text-neon-cyan backdrop-blur-md shadow-glow-sm">
-              <Sparkles size={14} className="text-brand-500 dark:text-brand-400 animate-pulse" />
-              <span>NEXT-GEN AI INTERVIEW ENGINE</span>
-            </div>
-          </div>
-
-          <h1 className="gsap-title text-6xl sm:text-8xl lg:text-[110px] font-black tracking-tight leading-[0.98] text-slate-900 dark:text-white mb-8">
-            Master Your Next<br />
-            Interview with{' '}
-            <span className="inline-block bg-gradient-to-r from-brand-500 via-indigo-500 to-violet-600 dark:from-brand-300 dark:via-neon-cyan dark:to-violet-400 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(99,102,241,0.4)] animate-pulse">
-              AI
+          <h1 className="gsap-title font-display text-6xl sm:text-8xl lg:text-[120px] font-extrabold tracking-tight leading-[0.95] mb-6">
+            <span className="inline-block bg-gradient-to-r from-brand-500 via-cyan-400 to-teal-300 dark:from-brand-300 dark:via-neon-cyan dark:to-cyan-200 bg-clip-text text-transparent drop-shadow-[0_0_40px_rgba(20,184,166,0.35)]">
+              InterviAI
             </span>
           </h1>
 
-          <p className="gsap-desc max-w-2xl text-lg sm:text-xl font-normal leading-relaxed text-slate-600 dark:text-ink-400 mb-12">
-            Hyper-personalized AI mock interviews tailored to your exact resume, target company, and technical seniority. Practice under real pressure with line-by-line feedback.
+          <p className="gsap-desc max-w-xl text-base sm:text-lg font-normal leading-relaxed text-slate-600 dark:text-ink-400 mb-10">
+            Personalized AI mock interviews with real-time feedback for your target role.
           </p>
 
-          <div className="gsap-cta flex flex-wrap items-center justify-center gap-5 mb-16">
-            <Link to="/register">
-              <MagneticButton variant="primary" className="text-base px-9 py-4">
-                Start Your First Mock Interview <ArrowRight size={18} />
-              </MagneticButton>
-            </Link>
-            <Link to="/login">
-              <MagneticButton variant="secondary" className="text-base px-8 py-4">
-                Sign In
-              </MagneticButton>
-            </Link>
-          </div>
-
-          <div className="gsap-cta flex flex-wrap items-center justify-center gap-8 text-xs font-semibold text-slate-500 dark:text-ink-500 uppercase tracking-widest mb-16">
-            <span className="flex items-center gap-2">
-              <CheckCircle2 size={15} className="text-emerald-500 dark:text-emerald-400" /> Free to Start
-            </span>
-            <span className="flex items-center gap-2">
-              <CheckCircle2 size={15} className="text-emerald-500 dark:text-emerald-400" /> No Credit Card Required
-            </span>
-            <span className="flex items-center gap-2">
-              <CheckCircle2 size={15} className="text-emerald-500 dark:text-emerald-400" /> 650+ Companies Supported
-            </span>
+          <div className="gsap-cta relative z-30 flex flex-wrap items-center justify-center gap-5 mb-14">
+            <MagneticButton to="/register" variant="primary" className="text-base px-9 py-4">
+              Start Mock Interview <ArrowRight size={18} />
+            </MagneticButton>
+            <MagneticButton to="/login" variant="secondary" className="text-base px-8 py-4">
+              Sign In
+            </MagneticButton>
           </div>
 
           <div className="gsap-scroll flex flex-col items-center gap-2 text-slate-400 dark:text-ink-500 text-xs tracking-widest uppercase">
@@ -412,9 +381,9 @@ export function Landing() {
 
         {/* ── Final Call to Action ── */}
         <section className="relative z-20 py-32 px-6 text-center max-w-5xl mx-auto">
-          <TiltCard className="p-16 border border-brand-500/30 bg-gradient-to-br from-brand-950/40 via-obsidian-950 to-violet-950/40 shadow-glow-lg">
+          <TiltCard className="p-16 border border-brand-500/30 bg-gradient-to-br from-brand-950/40 via-obsidian-950 to-cyan-950/40 shadow-glow-lg">
             <div className="flex flex-col items-center space-y-6">
-              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-brand-500 to-violet-600 text-white shadow-glow-indigo">
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-brand-500 to-cyan-500 text-white shadow-glow-indigo">
                 <BrainCircuit size={32} />
               </div>
               <h2 className="text-4xl sm:text-5xl font-black text-white">
@@ -423,11 +392,9 @@ export function Landing() {
               <p className="max-w-xl text-base text-ink-400">
                 Join thousands of software engineers, product managers, and data scientists practicing smarter with InterviAI.
               </p>
-              <Link to="/register">
-                <MagneticButton variant="primary" className="text-base px-10 py-4 mt-4">
-                  Start Your Free Trial Now <ArrowRight size={18} />
-                </MagneticButton>
-              </Link>
+              <MagneticButton to="/register" variant="primary" className="text-base px-10 py-4 mt-4">
+                Start Your Free Trial Now <ArrowRight size={18} />
+              </MagneticButton>
             </div>
           </TiltCard>
         </section>
@@ -436,7 +403,7 @@ export function Landing() {
         <footer className="relative z-20 border-t border-white/10 bg-transparent py-12 px-6">
           <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-600 text-white">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-cyan-500 text-white">
                 <BrainCircuit size={16} />
               </div>
               <span className="font-extrabold text-white">InterviAI</span>

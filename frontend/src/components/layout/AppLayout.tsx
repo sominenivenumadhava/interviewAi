@@ -1,6 +1,6 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Outlet, Navigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { BrainCircuit } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { useRequireAuth } from '../../contexts/AuthContext';
@@ -27,7 +27,7 @@ function LoadingScreen() {
       >
         {/* Logo */}
         <motion.div
-          className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-brand-500 to-violet-600 shadow-glow-lg"
+          className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-brand-500 to-cyan-500 shadow-glow-lg"
           animate={{ scale: [1, 1.06, 1] }}
           transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
         >
@@ -57,7 +57,7 @@ export function AppLayout() {
   const auth = useRequireAuth();
 
   if (auth.isLoading) return <LoadingScreen />;
-  if (!auth.isAuthenticated) return null;
+  if (!auth.isAuthenticated) return <Navigate to="/login" replace />;
 
   return (
     <AnimatedBackground variant="dashboard" className="min-h-screen">

@@ -1,61 +1,60 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Users, Activity, Server, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
+import { Users, Activity, Server, AlertTriangle } from 'lucide-react';
 import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
-  CardDescription } from
+  CardTitle } from
 '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { mockAdminStats } from '../data/mockData';
-export function Admin() {
-  return (
-    <div className="min-h-screen bg-ink-950 text-white">
-      {/* Admin Top Nav */}
-      <header className="border-b border-ink-800 bg-ink-900">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <Link to="/dashboard" className="text-ink-400 hover:text-white">
-              <ArrowLeft size={20} />
-            </Link>
-            <span className="text-lg font-bold text-brand-400">
-              InterviAI Admin
-            </span>
-          </div>
-          <Badge variant="danger">System Status: Healthy</Badge>
-        </div>
-      </header>
+import { useAuth } from '../contexts/AuthContext';
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-ink-800 bg-ink-900">
+export function Admin() {
+  const { hasRole, isLoading } = useAuth();
+
+  if (!isLoading && !hasRole('ADMIN')) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="page-title">Admin Dashboard</h1>
+          <p className="page-subtitle">System health and platform metrics</p>
+        </div>
+        <Badge variant="danger">System Status: Healthy</Badge>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-ink-400">
                     Total Users
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-white">
+                  <p className="mt-2 text-3xl font-bold text-ink-900 dark:text-white">
                     {mockAdminStats.totalUsers.toLocaleString()}
                   </p>
                 </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-900/30 text-brand-400">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-500/15 text-brand-400">
                   <Users size={24} />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-ink-800 bg-ink-900">
+          <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-ink-400">
                     Active Interviews
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-white">
+                  <p className="mt-2 text-3xl font-bold text-ink-900 dark:text-white">
                     {mockAdminStats.activeInterviews}
                   </p>
                 </div>
@@ -66,36 +65,36 @@ export function Admin() {
             </CardContent>
           </Card>
 
-          <Card className="border-ink-800 bg-ink-900">
+          <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-ink-400">
                     API Requests
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-white">
+                  <p className="mt-2 text-3xl font-bold text-ink-900 dark:text-white">
                     {(mockAdminStats.apiRequests / 1000000).toFixed(1)}M
                   </p>
                 </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-900/30 text-purple-400">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400">
                   <Server size={24} />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-ink-800 bg-ink-900">
+          <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-ink-400">
                     Avg Latency
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-white">
+                  <p className="mt-2 text-3xl font-bold text-ink-900 dark:text-white">
                     {mockAdminStats.avgLatency}
                   </p>
                 </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-900/30 text-orange-400">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-500/15 text-orange-400">
                   <AlertTriangle size={24} />
                 </div>
               </div>
@@ -104,19 +103,19 @@ export function Admin() {
         </div>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <Card className="border-ink-800 bg-ink-900">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-white">Recent Signups</CardTitle>
+              <CardTitle>Recent Signups</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {mockAdminStats.recentUsers.map((user) =>
                 <div
                   key={user.id}
-                  className="flex items-center justify-between border-b border-ink-800 pb-4 last:border-0 last:pb-0">
+                  className="flex items-center justify-between border-b border-ink-100 dark:border-ink-800 pb-4 last:border-0 last:pb-0">
                   
                     <div>
-                      <p className="font-medium text-white">{user.name}</p>
+                      <p className="font-medium text-ink-900 dark:text-white">{user.name}</p>
                       <p className="text-sm text-ink-400">{user.email}</p>
                     </div>
                     <div className="text-right">
@@ -133,16 +132,16 @@ export function Admin() {
             </CardContent>
           </Card>
 
-          <Card className="border-ink-800 bg-ink-900">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-white">System Logs</CardTitle>
+              <CardTitle>System Logs</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3 font-mono text-sm">
                 {mockAdminStats.systemLogs.map((log, i) =>
                 <div
                   key={i}
-                  className="flex items-start gap-3 rounded bg-ink-950 p-3">
+                  className="flex items-start gap-3 rounded bg-ink-50 dark:bg-ink-950 p-3">
                   
                     <span className="text-ink-500">{log.time}</span>
                     <span
@@ -150,14 +149,13 @@ export function Admin() {
                     
                       [{log.level}]
                     </span>
-                    <span className="text-ink-300">{log.message}</span>
+                    <span className="text-ink-600 dark:text-ink-300">{log.message}</span>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
         </div>
-      </main>
     </div>);
 
 }

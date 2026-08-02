@@ -4,12 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  BrainCircuit, Search, Flame, Bell, Moon, Sun, ChevronDown,
+  BrainCircuit, Bell, Moon, Sun, ChevronDown,
   LayoutDashboard, Video, LineChart, Target, Map, History,
-  User, Settings, LogOut, ShieldAlert,
+  User, Settings, LogOut, ShieldAlert, Search, FileText,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { Input } from '../ui/Input';
 
 // ─── Animation variants ───────────────────────────────────────────────────────
 const dropdownVariants = {
@@ -60,7 +59,7 @@ function NavLink({
 // ─── TopNav ───────────────────────────────────────────────────────────────────
 export function TopNav() {
   const { theme, toggleTheme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, hasRole } = useAuth();
   const location = useLocation();
   const [isProfileOpen, setIsProfileOpen]     = useState(false);
   const [isInterviewsOpen, setIsInterviewsOpen] = useState(false);
@@ -88,7 +87,9 @@ export function TopNav() {
   ];
 
   const isInterviewsActive =
-    location.pathname.startsWith('/interview') || location.pathname === '/history';
+    location.pathname.startsWith('/interview') ||
+    location.pathname === '/history' ||
+    location.pathname === '/resume';
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-ink-100 dark:border-white/[0.06] bg-white/85 dark:bg-obsidian-950/85 backdrop-blur-xl">
@@ -101,7 +102,7 @@ export function TopNav() {
             <motion.div
               whileHover={{ scale: 1.08, rotate: 5 }}
               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-              className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-600 shadow-glow-sm text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-cyan-500 shadow-glow-sm text-white"
             >
               <BrainCircuit size={18} />
             </motion.div>
@@ -164,6 +165,16 @@ export function TopNav() {
                       New Interview
                     </Link>
                     <Link
+                      to="/resume"
+                      onClick={() => setIsInterviewsOpen(false)}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500">
+                        <FileText size={14} />
+                      </div>
+                      Resume
+                    </Link>
+                    <Link
                       to="/history"
                       onClick={() => setIsInterviewsOpen(false)}
                       className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-ink-700 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/5 transition-colors"
@@ -182,24 +193,6 @@ export function TopNav() {
 
         {/* ── Right: Actions ── */}
         <div className="flex items-center gap-2">
-          {/* Search */}
-          <div className="hidden lg:block w-56">
-            <Input
-              placeholder="Search…"
-              icon={<Search size={15} />}
-              className="h-9 text-sm"
-            />
-          </div>
-
-          {/* Streak */}
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="flex items-center gap-1.5 rounded-full border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400"
-          >
-            <Flame size={13} className="text-amber-500" />
-            <span>0</span>
-          </motion.div>
-
           {/* Theme toggle */}
           <motion.button
             whileHover={{ scale: 1.1 }}
@@ -242,7 +235,7 @@ export function TopNav() {
               <img
                 src={
                   user?.profilePictureUrl ||
-                  `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=6366f1&color=fff&bold=true`
+                  `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=14b8a6&color=fff&bold=true`
                 }
                 alt={user?.firstName}
                 className="h-full w-full object-cover"
@@ -288,16 +281,18 @@ export function TopNav() {
                       </div>
                       Settings
                     </Link>
-                    <Link
-                      to="/admin"
-                      onClick={() => setIsProfileOpen(false)}
-                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
-                    >
-                      <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-100 dark:bg-brand-500/15 text-brand-500">
-                        <ShieldAlert size={13} />
-                      </div>
-                      Admin Dashboard
-                    </Link>
+                    {hasRole('ADMIN') && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
+                      >
+                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-100 dark:bg-brand-500/15 text-brand-500">
+                          <ShieldAlert size={13} />
+                        </div>
+                        Admin Dashboard
+                      </Link>
+                    )}
                   </div>
 
                   <div className="pt-1 mt-1 border-t border-ink-100 dark:border-white/[0.06]">

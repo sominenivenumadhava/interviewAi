@@ -7,8 +7,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'ui-monospace', 'monospace'],
+        sans: ['DM Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Syne', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['IBM Plex Mono', 'ui-monospace', 'monospace'],
       },
       colors: {
         // ─── Core Palette ─────────────────────────────────────────────────
@@ -19,26 +20,26 @@ export default {
           800: '#161e31',
           700: '#232d44ff',
         },
-        // ─── Brand = Indigo (unified — was split between blue + indigo) ───
+        // ─── Brand = Teal / Cyan cool AI ───────────────────────────────────
         brand: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
+          50: '#f0fdfa',
+          100: '#ccfbf1',
+          200: '#99f6e4',
+          300: '#5eead4',
+          400: '#2dd4bf',
+          500: '#14b8a6',
+          600: '#0d9488',
+          700: '#0f766e',
+          800: '#115e59',
+          900: '#134e4a',
+          950: '#042f2e',
         },
         // ─── Neon accents ─────────────────────────────────────────────────
         neon: {
           cyan: '#06b6d4',
           violet: '#8b5cf6',
           pink: '#ec4899',
-          indigo: '#6366f1',
+          indigo: '#14b8a6', // alias → teal for compat
           emerald: '#10b981',
         },
         // ─── Ink (neutral grays) ──────────────────────────────────────────
@@ -58,16 +59,16 @@ export default {
         // ─── Semantic ─────────────────────────────────────────────────────
         success: '#10b981',  // emerald
         warning: '#f59e0b',  // amber
-        danger: '#f43f5e',  // rose (was red #ef4444)
+        danger: '#f43f5e',  // rose
         info: '#06b6d4',  // cyan
         // ─── Chart palette (unified) ──────────────────────────────────────
         chart: {
-          indigo: '#6366f1',
+          indigo: '#14b8a6', // alias → teal
           cyan: '#06b6d4',
           emerald: '#10b981',
           amber: '#f59e0b',
           rose: '#f43f5e',
-          violet: '#8b5cf6',
+          violet: '#22d3ee',
           sky: '#38bdf8',
         },
       },
@@ -85,15 +86,15 @@ export default {
         lift: '0 8px 30px rgba(15,23,42,0.08)',
         // Dark
         card: '0 0 0 1px rgba(255,255,255,0.05), 0 4px 24px rgba(0,0,0,0.4)',
-        'card-hover': '0 0 0 1px rgba(99,102,241,0.3), 0 8px 32px rgba(0,0,0,0.5)',
+        'card-hover': '0 0 0 1px rgba(20,184,166,0.3), 0 8px 32px rgba(0,0,0,0.5)',
         // Glass
         glass: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-        // Glows
-        'glow-sm': '0 0 12px -3px rgba(99,102,241,0.3)',
-        'glow-md': '0 0 24px -5px rgba(99,102,241,0.4)',
-        'glow-lg': '0 0 48px -8px rgba(99,102,241,0.5)',
-        'glow-indigo': '0 0 25px -5px rgba(99, 102, 241, 0.4)',
-        'glow-violet': '0 0 25px -5px rgba(139, 92, 246, 0.4)',
+        // Glows (teal)
+        'glow-sm': '0 0 12px -3px rgba(20,184,166,0.3)',
+        'glow-md': '0 0 24px -5px rgba(20,184,166,0.4)',
+        'glow-lg': '0 0 48px -8px rgba(20,184,166,0.5)',
+        'glow-indigo': '0 0 25px -5px rgba(20, 184, 166, 0.4)', // alias → teal
+        'glow-violet': '0 0 25px -5px rgba(6, 182, 212, 0.4)',
         'glow-cyan': '0 0 25px -5px rgba(6, 182, 212, 0.4)',
         'glow-emerald': '0 0 25px -5px rgba(16, 185, 129, 0.4)',
         'glow-rose': '0 0 25px -5px rgba(244, 63, 94, 0.4)',
@@ -121,8 +122,8 @@ export default {
           '50%': { transform: 'translateY(-8px)' },
         },
         'border-pulse': {
-          '0%, 100%': { borderColor: 'rgba(99,102,241,0.3)' },
-          '50%': { borderColor: 'rgba(99,102,241,0.8)' },
+          '0%, 100%': { borderColor: 'rgba(20,184,166,0.3)' },
+          '50%': { borderColor: 'rgba(20,184,166,0.8)' },
         },
         'progress-fill': {
           '0%': { width: '0%' },

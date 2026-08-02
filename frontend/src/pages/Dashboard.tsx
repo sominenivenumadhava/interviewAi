@@ -142,7 +142,7 @@ export function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.35 }}
-            className="rounded-2xl border border-brand-500/40 bg-gradient-to-r from-brand-950/80 via-obsidian-950 to-violet-950/80 p-6 shadow-glow-md backdrop-blur-md"
+            className="rounded-2xl border border-brand-500/40 bg-gradient-to-r from-brand-950/80 via-obsidian-950 to-cyan-950/80 p-6 shadow-glow-md backdrop-blur-md"
           >
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-brand-500/20">
               <div className="flex items-center gap-3">
@@ -304,9 +304,9 @@ export function Dashboard() {
           suffix={bestScore > 0 ? '%' : ''}
           description={bestScore > 0 && bestRole ? `Best in: ${bestRole}` : 'Complete an interview to track'}
           icon={<Target size={20} />}
-          iconColor="bg-violet-500/10"
-          iconTextColor="text-violet-500"
-          accentColor="border-l-violet-500"
+          iconColor="bg-cyan-500/10"
+          iconTextColor="text-cyan-500"
+          accentColor="border-l-cyan-500"
           delay={0.24}
         />
       </div>
@@ -348,9 +348,9 @@ export function Dashboard() {
                   <Line
                     type="monotone"
                     dataKey="score"
-                    stroke="#6366f1"
+                    stroke="#14b8a6"
                     strokeWidth={2.5}
-                    dot={{ r: 4, fill: '#6366f1', strokeWidth: 2, stroke: '#111827' }}
+                    dot={{ r: 4, fill: '#14b8a6', strokeWidth: 2, stroke: '#111827' }}
                     activeDot={{ r: 6, fill: '#818cf8' }}
                     animationDuration={1200}
                     animationEasing="ease-out"

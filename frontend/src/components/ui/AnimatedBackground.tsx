@@ -42,24 +42,24 @@ export function AnimatedBackground({
 
   const blobConfigs = {
     auth: [
-      { dark: 'rgba(99,102,241,0.18)',  light: 'rgba(99,102,241,0.10)',  size: 600, top: '5%',  left: '10%', delay: 0  },
-      { dark: 'rgba(139,92,246,0.14)',  light: 'rgba(139,92,246,0.08)',  size: 500, top: '50%', left: '70%', delay: 4  },
+      { dark: 'rgba(20,184,166,0.18)',  light: 'rgba(20,184,166,0.10)',  size: 600, top: '5%',  left: '10%', delay: 0  },
+      { dark: 'rgba(6,182,212,0.14)',  light: 'rgba(6,182,212,0.08)',  size: 500, top: '50%', left: '70%', delay: 4  },
       { dark: 'rgba(236,72,153,0.10)',  light: 'rgba(236,72,153,0.06)',  size: 400, top: '75%', left: '20%', delay: 8  },
     ],
     dashboard: [
-      { dark: 'rgba(99,102,241,0.11)',  light: 'rgba(99,102,241,0.06)',  size: 700, top: '-5%', left: '-5%', delay: 0  },
+      { dark: 'rgba(20,184,166,0.11)',  light: 'rgba(20,184,166,0.06)',  size: 700, top: '-5%', left: '-5%', delay: 0  },
       { dark: 'rgba(6,182,212,0.09)',   light: 'rgba(6,182,212,0.05)',   size: 500, top: '60%', left: '80%', delay: 5  },
-      { dark: 'rgba(139,92,246,0.07)',  light: 'rgba(139,92,246,0.04)',  size: 450, top: '40%', left: '40%', delay: 9  },
+      { dark: 'rgba(6,182,212,0.07)',  light: 'rgba(6,182,212,0.04)',  size: 450, top: '40%', left: '40%', delay: 9  },
     ],
     landing: [
-      { dark: 'rgba(99,102,241,0.22)',  light: 'rgba(99,102,241,0.12)',  size: 800, top: '-10%', left: '-10%', delay: 0  },
-      { dark: 'rgba(139,92,246,0.18)',  light: 'rgba(139,92,246,0.10)',  size: 650, top: '30%',  left: '60%',  delay: 3  },
+      { dark: 'rgba(20,184,166,0.22)',  light: 'rgba(20,184,166,0.12)',  size: 800, top: '-10%', left: '-10%', delay: 0  },
+      { dark: 'rgba(6,182,212,0.18)',  light: 'rgba(6,182,212,0.10)',  size: 650, top: '30%',  left: '60%',  delay: 3  },
       { dark: 'rgba(6,182,212,0.12)',   light: 'rgba(6,182,212,0.07)',   size: 500, top: '80%',  left: '10%',  delay: 7  },
       { dark: 'rgba(236,72,153,0.10)',  light: 'rgba(236,72,153,0.06)',  size: 400, top: '60%',  left: '85%',  delay: 11 },
     ],
     interview: [
       { dark: 'rgba(6,182,212,0.14)',   light: 'rgba(6,182,212,0.07)',   size: 600, top: '5%',  left: '60%', delay: 0 },
-      { dark: 'rgba(99,102,241,0.11)',  light: 'rgba(99,102,241,0.06)',  size: 500, top: '70%', left: '5%',  delay: 5 },
+      { dark: 'rgba(20,184,166,0.11)',  light: 'rgba(20,184,166,0.06)',  size: 500, top: '70%', left: '5%',  delay: 5 },
     ],
   };
 
@@ -71,7 +71,7 @@ export function AnimatedBackground({
       className={`relative min-h-screen overflow-hidden ${className} bg-slate-50 dark:bg-obsidian-950`}
     >
       {/* ── Light-mode wash ── */}
-      <div className="absolute inset-0 pointer-events-none dark:hidden bg-gradient-to-br from-slate-50 via-indigo-50/40 to-violet-50/20" />
+      <div className="absolute inset-0 pointer-events-none dark:hidden bg-gradient-to-br from-slate-50 via-teal-50/40 to-cyan-50/20" />
 
       {/* ── Dark-mode base ── */}
       <div className="absolute inset-0 pointer-events-none hidden dark:block bg-obsidian-950" />
@@ -130,7 +130,7 @@ export function AnimatedBackground({
           style={{
             width: 650,
             height: 650,
-            background: 'radial-gradient(circle, rgba(99,102,241,0.055) 0%, transparent 65%)',
+            background: 'radial-gradient(circle, rgba(20,184,166,0.055) 0%, transparent 65%)',
             // ✅ Correct reactive approach: pass motion values directly to style
             left: spotX,
             top:  spotY,

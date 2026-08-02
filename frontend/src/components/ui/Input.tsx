@@ -31,7 +31,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               reduced
                 ? {}
                 : isFocused || hasValue
-                ? { y: -22, scale: 0.78, color: error ? '#f43f5e' : '#6366f1' }
+                ? { y: -22, scale: 0.78, color: error ? '#f43f5e' : '#14b8a6' }
                 : { y: 0, scale: 1, color: '#94a3b8' }
             }
             style={{ top: '50%', translateY: '-50%', fontSize: '0.875rem' }}
@@ -88,14 +88,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               borderColor: isFocused
                 ? error
                   ? '#f43f5e'
-                  : '#6366f1'
+                  : '#14b8a6'
                 : error
                 ? 'rgba(244,63,94,0.5)'
                 : undefined,
               boxShadow: isFocused
                 ? error
                   ? '0 0 0 3px rgba(244,63,94,0.12)'
-                  : '0 0 0 3px rgba(99,102,241,0.12)'
+                  : '0 0 0 3px rgba(20,184,166,0.12)'
                 : 'none',
             }}
             {...props}

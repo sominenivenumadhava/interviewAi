@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -27,19 +27,36 @@ import { Analytics } from './pages/Analytics';
 import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
 
+function LegalPlaceholder({ title }: { title: string }) {
+  return (
+    <div className="min-h-screen bg-obsidian-950 text-white flex flex-col items-center justify-center px-6 text-center">
+      <h1 className="font-display text-3xl font-bold mb-3">{title}</h1>
+      <p className="text-ink-400 max-w-md mb-8">
+        This page is a placeholder. Full legal copy will be published here soon.
+      </p>
+      <Link to="/" className="text-brand-400 hover:text-brand-300 text-sm font-semibold">
+        ← Back to home
+      </Link>
+    </div>
+  );
+}
+
 // ─── Animated Routes ──────────────────────────────────────────────────────────
 function AnimatedRoutes() {
   const location = useLocation();
 
+  // Key only the animated shell — keeps React Router stable and makes Link clicks reliable
   return (
     <AnimatePresence mode="wait" initial={false}>
-      <Routes location={location} key={location.pathname}>
+      <Routes location={location}>
         {/* Public Routes */}
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/auth/callback" element={<OAuthCallback />} />
+        <Route path="/terms" element={<LegalPlaceholder title="Terms of Service" />} />
+        <Route path="/privacy" element={<LegalPlaceholder title="Privacy Policy" />} />
 
         {/* App Shell Routes */}
         <Route element={<AppLayout />}>
@@ -55,11 +72,11 @@ function AnimatedRoutes() {
           <Route path="/history" element={<History />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/admin" element={<Admin />} />
         </Route>
 
         {/* Standalone Routes */}
         <Route path="/interview/room" element={<Room />} />
-        <Route path="/admin" element={<Admin />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -86,4 +103,4 @@ export function App() {
       </AuthProvider>
     </ThemeProvider>
   );
-}
+}
