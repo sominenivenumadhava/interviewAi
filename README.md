@@ -38,60 +38,52 @@ InterviAI is an AI-powered personalized virtual interview preparation and assess
 | Frontend (production compose) | `80` | nginx serving `dist` |
 | Backend (production compose) | `8082` | |
 
-## Getting Started
+## Run on your computer (not cloud)
+
+Open a terminal **on your laptop** (not the Cursor cloud agent):
+
+```bash
+git clone https://github.com/sominenivenumadhava/interviewAi.git
+cd interviewAi
+git checkout redesign/modern-ai-ui-and-bugfixes
+
+# Needs: Java 21, Maven 3.9+, Node 18+, Docker Desktop
+chmod +x scripts/*.sh
+./scripts/run-local.sh
+```
+
+Then open **http://localhost:5173** in your browser.
+
+Stop everything:
+
+```bash
+./scripts/stop-local.sh
+```
 
 ### Prerequisites
 
 - Node.js 18+ (20 recommended)
 - Java 21+
 - Maven 3.9+
-- PostgreSQL 14+ **or** Docker for `docker-compose.dev.yml`
+- Docker Desktop (starts Postgres on host port `5433`)
 
-### 1. Environment
+### Manual start (alternative)
 
 ```bash
 cp .env.template .env
-# Fill at least: DB_*, JWT_SECRET, OPENROUTER_API_KEY
+# Set DB_PORT=5433 and DB_PASSWORD=interviai_password to match docker-compose.dev.yml
+
+docker compose -f docker-compose.dev.yml up -d postgres redis
+
+cd backend && mvn spring-boot:run -Dspring-boot.run.profiles=dev
+# new terminal:
+cd frontend && npm ci && npm run dev
 ```
 
-See `.env.template` for the full list (OpenRouter, optional Deepgram/Apify/Mail/OAuth).
+- App: `http://localhost:5173`
+- API: `http://localhost:8082`
+- Swagger: `http://localhost:8082/swagger-ui/index.html`
 
-### 2. Database
-
-**Option A — Docker (recommended for local apps):**
-
-```bash
-docker compose -f docker-compose.dev.yml up -d postgres
-# Host apps: DB_PORT=5433  (dev profile default in application.yml)
-```
-
-**Option B — Local PostgreSQL on 5432:**
-
-```bash
-createdb interviai_dev
-# Set DB_PORT=5432 in .env
-```
-
-### 3. Backend
-
-```bash
-cd backend
-mvn spring-boot:run
-# or: mvn -DskipTests package && java -jar target/backend-1.0.0.jar
-```
-
-API: `http://localhost:8082`  
-Swagger: `http://localhost:8082/swagger-ui/index.html`
-
-### 4. Frontend
-
-```bash
-cd frontend
-npm ci
-npm run dev
-```
-
-App: `http://localhost:5173`  
 Dev API calls go through the Vite proxy to `8082`. For production builds, set `VITE_API_BASE_URL` to the API **origin only** (e.g. `http://localhost:8082`) — do **not** append `/api/v1`.
 
 ### Tests

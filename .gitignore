@@ -26,3 +26,6 @@ dist-ssr
 # Environment configurations
 .env
 
+# Local run helper (scripts/run-local.sh)
+.local-run/
+
