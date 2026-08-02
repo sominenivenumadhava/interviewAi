@@ -7,209 +7,149 @@ InterviAI is an AI-powered personalized virtual interview preparation and assess
 ## Project Structure
 
 ```
-├── frontend/          # React + TypeScript frontend application
-│   ├── src/
-│   ├── public/
-│   ├── package.json
-│   └── vite.config.ts
-├── backend/           # Spring Boot backend application  
-│   ├── src/
-│   ├── pom.xml
-│   └── docs/
-├── docs/              # Project documentation
-└── README.md          # This file
+├── frontend/          # React + TypeScript (Vite)
+├── backend/           # Spring Boot 3.2 (Java 21)
+├── docker-compose.yml       # Full stack (Postgres, Redis, backend, frontend)
+├── docker-compose.dev.yml   # Dev infra only (Postgres on host port 5433)
+├── .env.template            # Environment variable reference
+└── README.md
 ```
 
 ## Technology Stack
 
 ### Frontend
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **State Management**: React Context + Hooks
-- **HTTP Client**: Fetch API
-- **Development**: Hot reload, ESLint, TypeScript checking
+- React 18 + TypeScript, Vite, Tailwind CSS
+- React Router, Framer Motion, Recharts
 
 ### Backend
-- **Language**: Java 21
-- **Framework**: Spring Boot 3.2
-- **Security**: Spring Security + JWT
-- **Database**: PostgreSQL with Liquibase migrations
-- **ORM**: Spring Data JPA (Hibernate)
-- **AI Integration**: Google Gemini API
-- **Documentation**: OpenAPI/Swagger
-- **Testing**: JUnit 5, Mockito, TestContainers
+- Java 21, Spring Boot 3.2
+- Spring Security + JWT, Spring Data JPA, Liquibase, PostgreSQL
+- AI via **OpenRouter** (OpenAI-compatible chat completions; not direct Google Gemini API)
+- OpenAPI/Swagger, JUnit 5 / Mockito / Testcontainers
+
+## Ports
+
+| Service | Local default | Notes |
+|---------|---------------|--------|
+| Frontend (Vite) | `5173` | `npm run dev` |
+| Backend | `8082` | Spring Boot `server.port` |
+| PostgreSQL (local install) | `5432` | See `.env.template` `DB_PORT` |
+| PostgreSQL (`docker-compose.dev.yml`) | host `5433` → container `5432` | Use `DB_PORT=5433` for host apps |
+| Frontend (production compose) | `80` | nginx serving `dist` |
+| Backend (production compose) | `8082` | |
 
 ## Getting Started
 
 ### Prerequisites
 
-- **Node.js** 18+ (for frontend)
-- **Java** 21+ (for backend)
-- **PostgreSQL** 14+ (for database)
-- **Maven** 3.9+ (for backend build)
+- Node.js 18+ (20 recommended)
+- Java 21+
+- Maven 3.9+
+- PostgreSQL 14+ **or** Docker for `docker-compose.dev.yml`
 
-### Frontend Setup
+### 1. Environment
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cp .env.template .env
+# Fill at least: DB_*, JWT_SECRET, OPENROUTER_API_KEY
 ```
 
-The frontend will be available at `http://localhost:5173`
+See `.env.template` for the full list (OpenRouter, optional Deepgram/Apify/Mail/OAuth).
 
-### Backend Setup
+### 2. Database
 
-1. **Database Setup**
+**Option A — Docker (recommended for local apps):**
+
 ```bash
-# Create PostgreSQL database
+docker compose -f docker-compose.dev.yml up -d postgres
+# Host apps: DB_PORT=5433  (dev profile default in application.yml)
+```
+
+**Option B — Local PostgreSQL on 5432:**
+
+```bash
 createdb interviai_dev
+# Set DB_PORT=5432 in .env
 ```
 
-2. **Environment Variables**
-```bash
-# Create application-local.yml or set environment variables
-export DB_USERNAME=your_db_user
-export DB_PASSWORD=your_db_password
-export JWT_SECRET=your-256-bit-secret-key
-export OPENROUTER_API_KEY=sk-or-v1-your-openrouter-key
-# Optional; this cost-focused Gemini Flash-Lite model is already the default:
-export OPENROUTER_MODEL=google/gemini-2.5-flash-lite
-```
+### 3. Backend
 
-Create the API key in your OpenRouter dashboard. All AI features use OpenRouter's
-OpenAI-compatible chat-completions endpoint; the backend no longer calls Google's
-Gemini API directly.
-
-3. **Run Backend**
 ```bash
 cd backend
 mvn spring-boot:run
+# or: mvn -DskipTests package && java -jar target/backend-1.0.0.jar
 ```
 
-The backend API will be available at `http://localhost:8080`
+API: `http://localhost:8082`  
+Swagger: `http://localhost:8082/swagger-ui/index.html`
 
-### API Documentation
+### 4. Frontend
 
-Once the backend is running, access the Swagger UI at:
-`http://localhost:8080/swagger-ui/index.html`
+```bash
+cd frontend
+npm ci
+npm run dev
+```
 
-## Features
+App: `http://localhost:5173`  
+Dev API calls go through the Vite proxy to `8082`. For production builds, set `VITE_API_BASE_URL` to the API **origin only** (e.g. `http://localhost:8082`) — do **not** append `/api/v1`.
 
-### Current Implementation
+### Tests
 
-#### ✅ Common Module
-- Base entities with audit trails
-- Standardized API responses
-- Global exception handling
-- Comprehensive utility classes
-- Error codes and constants
+```bash
+cd backend && mvn test
+cd frontend && npm run lint
+```
 
-#### ✅ Authentication Module  
-- JWT-based authentication
-- Refresh token management
-- Password reset functionality
-- Multi-device session support
-- Role-based authorization
+### Production build (local)
 
-### Planned Modules
+```bash
+# Backend JAR
+cd backend && mvn -DskipTests package
 
-#### 🚧 User Module (Next)
-- User registration and profiles
-- Email verification
-- User preferences and settings
-- Profile management
+# Frontend static assets
+cd frontend && npm ci && npm run build
+```
 
-#### 📋 Upcoming Modules
-- Resume Module (PDF parsing, content extraction)
-- Interview Module (session management, workflow)
-- Question Module (AI-powered question generation)
-- Answer Module (answer submission, validation)
-- Evaluation Module (AI assessment, scoring)
-- Analytics Module (performance metrics, insights)
-- Dashboard Module (user dashboard, reports)
+### Full stack with Docker
 
-## Development
+```bash
+cp .env.template .env   # JWT_SECRET is required (compose fails closed without it)
+docker compose up -d --build
+```
 
-### Code Quality
+- Frontend: `http://localhost`
+- Backend: `http://localhost:8082`
+- Uses Spring profile `docker` (Postgres hostname `postgres`)
 
-- **Backend**: 85%+ test coverage target
-- **Frontend**: ESLint + TypeScript strict mode
-- **API**: OpenAPI documentation for all endpoints
-- **Database**: Liquibase migrations for schema changes
+## Features (implemented)
 
-### Architecture Principles
+- **Common** — base entities, API responses, exception handling
+- **Authentication** — JWT, refresh tokens, password reset
+- **User** — registration, profile, preferences
+- **Resume** — upload/parse (PDF), skills/experience extraction
+- **Interview** — sessions, questions, answers
+- **Evaluation** — AI scoring and feedback
+- **Analytics / Dashboard** — performance metrics and summaries
+- **AI** — OpenRouter chat completions; optional speech token endpoint
+- **Jobs** — job search via optional Apify scrape
+- **Notification** — email (when SMTP configured)
 
-- **Clean Architecture**: Clear separation of concerns
-- **SOLID Principles**: Maintainable and extensible code
-- **Domain-Driven Design**: Business logic encapsulation
-- **REST Standards**: Consistent API design
-- **Security First**: Enterprise-grade security practices
+### Optional integrations
 
-### Development Workflow
+| Integration | Env | Behavior when unset |
+|-------------|-----|---------------------|
+| **OpenRouter** | `OPENROUTER_API_KEY` | Required for AI question/eval features |
+| **Deepgram** | `DEEPGRAM_API_KEY` | Browser speech / mock token path used instead |
+| **Apify** | `APIFY_API_TOKEN` | Live job scrape disabled |
+| **Mail** | `MAIL_USERNAME` / `MAIL_PASSWORD` | Password-reset / notification emails unavailable |
 
-1. **Feature Development**: Create feature branch from `develop`
-2. **Testing**: Write tests for new functionality
-3. **Code Review**: Peer review before merging
-4. **Integration**: Merge to `develop` branch
-5. **Deployment**: Deploy from `main` branch
+## Development notes
 
-## Environment Configuration
-
-### Development
-- Frontend: `http://localhost:5173`
-- Backend: `http://localhost:8080`  
-- Database: Local PostgreSQL
-
-### Production
-- Frontend: `https://app.interviai.com`
-- Backend: `https://api.interviai.com`
-- Database: Managed PostgreSQL service
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- Default Spring profile: `dev` (DB defaults to `localhost:5433` for compose-dev Postgres)
+- `JWT_SECRET`: weak/local default only under `dev` / `test`; `prod` and `docker` require env
+- Frontend production base URL: `VITE_API_BASE_URL` (origin only)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-For support and questions:
-- 📧 Email: support@interviai.com
-- 📖 Documentation: [Project Wiki](docs/)
-- 🐛 Issues: [GitHub Issues](https://github.com/interviai/platform/issues)
-
----
-
-## Quick Commands
-
-### Frontend
-```bash
-npm run dev      # Start development server
-npm run build    # Build for production
-npm run preview  # Preview production build
-npm run lint     # Run ESLint
-npm run type-check # TypeScript checking
-```
-
-### Backend
-```bash
-mvn spring-boot:run        # Start development server
-mvn clean package          # Build JAR file
-mvn test                   # Run tests
-mvn spring-boot:build-info # Generate build info
-```
-
-### Database
-```bash
-mvn liquibase:update       # Apply database migrations
-mvn liquibase:rollback     # Rollback last migration
-mvn liquibase:status       # Check migration status
-```
+MIT — see [LICENSE](LICENSE) if present.

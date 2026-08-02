@@ -152,7 +152,7 @@ app:
         - docx
   
   frontend:
-    url: ${FRONTEND_URL:http://localhost:3000}
+    url: ${FRONTEND_URL:http://localhost:5173}
   
   security:
     rate-limit:
@@ -315,5 +315,54 @@ openrouter:
     base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
     model: ${OPENROUTER_MODEL:google/gemini-2.5-flash-lite}
     site-url: ${OPENROUTER_SITE_URL:https://app.interviai.com}
+    app-name: ${OPENROUTER_APP_NAME:InterviAI}
+    timeout: 30000
+
+---
+# Docker Compose profile: mirrors prod hardening but uses compose DNS names
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:interviai_dev}
+    username: ${DB_USERNAME:interviai_user}
+    password: ${DB_PASSWORD:interviai_password}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+logging:
+  level:
+    com.interviai.backend: INFO
+    org.springframework.security: WARN
+
+app:
+  cors:
+    allowed-origins:
+      - ${FRONTEND_URL:http://localhost}
+      - http://localhost
+      - http://localhost:80
+
+  frontend:
+    url: ${FRONTEND_URL:http://localhost}
+
+  # JWT_SECRET must be provided (no default) — set via compose/.env
+  jwt:
+    secret: ${JWT_SECRET}
+
+  security:
+    rate-limit:
+      requests-per-minute: 100
+
+openrouter:
+  api:
+    key: ${OPENROUTER_API_KEY:}
+    base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+    model: ${OPENROUTER_MODEL:google/gemini-2.5-flash-lite}
+    site-url: ${OPENROUTER_SITE_URL:http://localhost}
     app-name: ${OPENROUTER_APP_NAME:InterviAI}
     timeout: 30000

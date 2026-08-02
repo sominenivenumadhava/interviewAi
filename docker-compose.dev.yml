@@ -1,5 +1,8 @@
 version: '3.8'
 
+# Dev infrastructure only (Postgres + Redis + pgAdmin).
+# Host apps (Spring Boot / Vite) connect with DB_PORT=5433 (mapped from container 5432).
+# Example: export DB_PORT=5433  (or set in .env — see .env.template)
 services:
   # Development Database Only
   postgres:
@@ -10,6 +13,7 @@ services:
       POSTGRES_USER: interviai_user
       POSTGRES_PASSWORD: interviai_password
     ports:
+      # Host 5433 → container 5432 so local apt Postgres on 5432 can coexist
       - "5433:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
