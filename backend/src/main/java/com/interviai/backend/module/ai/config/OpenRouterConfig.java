@@ -26,13 +26,17 @@ public class OpenRouterConfig {
 
     @Bean
     public WebClient openRouterWebClient() {
-        return WebClient.builder()
+        WebClient.Builder builder = WebClient.builder()
                 .baseUrl(baseUrl)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, "application/json")
                 .defaultHeader("HTTP-Referer", siteUrl)
-                .defaultHeader("X-Title", appName)
-                .build();
+                .defaultHeader("X-Title", appName);
+        
+        if (apiKey != null && !apiKey.isBlank()) {
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey.trim());
+        }
+        
+        return builder.build();
     }
 
     public String getDefaultModel() {

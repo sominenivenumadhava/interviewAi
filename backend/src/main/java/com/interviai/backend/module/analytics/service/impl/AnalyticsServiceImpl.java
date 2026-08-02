@@ -297,7 +297,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         UserAnalyticsResponse.OverviewMetrics metrics = new UserAnalyticsResponse.OverviewMetrics();
         
         // Total interviews
-        long totalInterviews = interviewRepository.countByUserAndStatus(user, null);
+        long totalInterviews = interviewRepository.countByUser(user);
         metrics.setTotalInterviews((int) totalInterviews);
         
         // Completed interviews

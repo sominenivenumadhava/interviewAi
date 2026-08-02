@@ -9,21 +9,21 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Badge({ className, variant = 'default', pulse = false, ...props }: BadgeProps) {
   const variants: Record<string, string> = {
     default:
-      'border-transparent bg-brand-500/10 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300',
+      'border-brand-500/30 bg-brand-500/15 text-brand-300',
     secondary:
-      'border-transparent bg-ink-100 text-ink-700 dark:bg-white/8 dark:text-ink-200',
+      'border-white/10 bg-white/10 text-white font-semibold',
     outline:
-      'text-ink-700 dark:text-ink-200 border-ink-200 dark:border-white/15 bg-transparent',
+      'border-white/20 bg-transparent text-ink-200 font-medium',
     success:
-      'border-transparent bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+      'border-emerald-500/30 bg-emerald-500/15 text-emerald-400',
     warning:
-      'border-transparent bg-amber-500/10 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+      'border-amber-500/30 bg-amber-500/15 text-amber-300',
     danger:
-      'border-transparent bg-rose-500/10 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400',
+      'border-rose-500/30 bg-rose-500/15 text-rose-300',
     info:
-      'border-transparent bg-cyan-500/10 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-400',
+      'border-cyan-500/30 bg-cyan-500/15 text-cyan-300',
     premium:
-      'border-transparent bg-gradient-to-r from-brand-500/20 to-violet-500/20 text-brand-600 dark:text-brand-300 border border-brand-500/20',
+      'border-brand-500/30 bg-gradient-to-r from-brand-500/20 to-violet-500/20 text-brand-300',
   };
 
   return (

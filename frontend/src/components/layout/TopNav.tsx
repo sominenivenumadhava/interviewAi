@@ -85,8 +85,6 @@ export function TopNav() {
     { name: 'Dashboard', path: '/dashboard',  icon: LayoutDashboard },
     { name: 'Find Jobs',  path: '/jobs',        icon: Search },
     { name: 'Analytics', path: '/analytics',   icon: LineChart },
-    { name: 'Skill Gap',  path: '/skill-gap',   icon: Target },
-    { name: 'Roadmap',    path: '/roadmap',      icon: Map },
   ];
 
   const isInterviewsActive =

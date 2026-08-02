@@ -12,15 +12,15 @@ import {
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { MotionCard } from '../components/ui/MotionCard';
-import { ProgressBar } from '../components/ui/ProgressBar';
 import { PageHeader } from '../components/ui/PageHeader';
 import { DashboardSkeleton } from '../components/ui/Skeleton';
 import {
   Play, FileText, TrendingUp, Target, Clock, Sparkles,
-  Activity, RefreshCw,
+  Activity, RefreshCw, BarChart2,
 } from 'lucide-react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer,
 } from 'recharts';
 import { useInterviewSession } from '../contexts/InterviewSessionContext';
 
@@ -30,33 +30,68 @@ const ChartTooltip = ({ active, payload, label }: any) => {
   return (
     <div className="rounded-xl border border-white/10 bg-obsidian-900 px-3 py-2 shadow-card text-xs">
       <p className="text-ink-400 mb-1">{label}</p>
-      <p className="font-bold text-brand-400">{payload[0]?.value}%</p>
+      <p className="font-bold text-brand-400">{payload[0]?.value?.toFixed(1)}%</p>
     </div>
   );
 };
+
+// ─── Empty chart placeholder ────────────────────────────────────────────────────
+function EmptyChart() {
+  return (
+    <div className="flex flex-col items-center justify-center h-[260px] gap-3 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500">
+        <BarChart2 size={28} />
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-ink-300">No interview data yet</p>
+        <p className="text-xs text-ink-500 mt-1">Complete your first mock interview to see your score trend here.</p>
+      </div>
+      <Link to="/interview/company">
+        <Button variant="gradient" size="sm" className="mt-2">
+          <Play className="h-3.5 w-3.5" /> Start First Interview
+        </Button>
+      </Link>
+    </div>
+  );
+}
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export function Dashboard() {
   const { activeSession } = useInterviewSession();
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [loading, setLoading]     = useState(true);
+  const [loading, setLoading]      = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError]          = useState<string | null>(null);
 
   const fetchDashboardData = async () => {
+    setError(null);
     try {
       const response = await apiClient.get<any>(API_ENDPOINTS.DASHBOARD.GET);
-      if (response.data) setDashboardData(response.data);
-    } catch (err) {
-      console.warn('Dashboard fetch fallback:', err);
+      if (response.data) {
+        // Handle both wrapped { data: ... } and direct response shapes
+        const payload = response.data?.data ?? response.data;
+        setDashboardData(payload);
+      }
+    } catch (err: any) {
+      console.warn('Dashboard fetch error:', err);
+      setError('Could not load dashboard data. Please refresh.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
+  // Fetch on mount and whenever a session moves to 'completed'
   useEffect(() => {
     fetchDashboardData();
-  }, [activeSession?.status]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // If a session just finished (completed), refresh dashboard stats
+  useEffect(() => {
+    if (activeSession?.status === 'completed') {
+      fetchDashboardData();
+    }
+  }, [activeSession?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -66,21 +101,33 @@ export function Dashboard() {
 
   const isInterviewActive = activeSession?.status === 'in_progress';
 
-  const chartData =
-    dashboardData?.performanceOverview?.last30DaysTrend || [
-      { label: 'Session 1', score: 68 },
-      { label: 'Session 2', score: 74 },
-      { label: 'Session 3', score: 79 },
-      { label: 'Session 4', score: 82 },
-      { label: 'Session 5', score: 84 },
-      { label: 'Session 6', score: 88 },
-    ];
+  // ── Real chart data: from backend performanceOverview.last30DaysTrend ──────
+  // Each entry has { date, score, label } from DashboardServiceImpl.buildScoreTrend()
+  const rawTrend: any[] = dashboardData?.performanceOverview?.last30DaysTrend ?? [];
+  const chartData = rawTrend.map((t: any) => ({
+    label: t.label ?? t.date ?? '',
+    score: typeof t.score === 'number' ? Math.round(t.score) : 0,
+  }));
+  const hasChartData = chartData.length > 0;
 
-  const weakSkills = [
-    { name: 'System Scaling & Tradeoffs', score: 72, color: 'amber' as const },
-    { name: 'Graph Algorithms',           score: 68, color: 'rose'  as const },
-    { name: 'STAR Behavioral Quantifying', score: 84, color: 'emerald' as const },
-  ];
+  // ── Stats: use real API values, fall back to 0 (not fake numbers) ──────────
+  const totalSessions  = dashboardData?.interviewStats?.totalInterviews   ?? 0;
+  const avgScore       = dashboardData?.performanceOverview?.averageScore  ?? 0;
+  const practiceHours  = dashboardData?.userSummary?.totalPracticeHours   ?? 0;
+  const bestScore      = dashboardData?.performanceOverview?.bestScore     ?? 0;
+  const completedMonth = dashboardData?.interviewStats?.completedThisMonth ?? 0;
+  const improvement    = dashboardData?.performanceOverview?.improvement   ?? 0;
+  const userLevel      = dashboardData?.userSummary?.currentLevel         ?? 'Beginner';
+  const bestRole       = dashboardData?.performanceOverview?.bestScoreRole ?? '';
+  const trend          = dashboardData?.performanceOverview?.trend         ?? 'NO_DATA';
+
+  const improvementText = trend === 'UP'
+    ? `+${improvement?.toFixed(1)}% from last session`
+    : trend === 'DOWN'
+    ? `${improvement?.toFixed(1)}% from last session`
+    : trend === 'NO_DATA' || totalSessions === 0
+    ? 'Complete an interview to track'
+    : 'No change from last session';
 
   if (loading) return <DashboardSkeleton />;
 
@@ -177,7 +224,11 @@ export function Dashboard() {
       {/* ── Page Header ── */}
       <PageHeader
         title="Interview Dashboard"
-        subtitle="Real-time performance metrics generated from your interview history."
+        subtitle={
+          totalSessions === 0
+            ? "Welcome! Start your first mock interview to see your performance data."
+            : "Real-time performance metrics generated from your interview history."
+        }
       >
         <Button
           onClick={() => { setRefreshing(true); fetchDashboardData(); }}
@@ -196,12 +247,29 @@ export function Dashboard() {
         </Link>
       </PageHeader>
 
+      {/* ── Error Banner ── */}
+      {error && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-400 flex items-center gap-2">
+          <span>{error}</span>
+          <button
+            onClick={() => { setRefreshing(true); fetchDashboardData(); }}
+            className="ml-auto text-xs underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* ── Stat Cards ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MotionCard
           title="Total Practice Sessions"
-          value={dashboardData?.interviewStats?.totalInterviews || 24}
-          description={`${dashboardData?.interviewStats?.completedThisMonth || 8} completed this month`}
+          value={totalSessions}
+          description={
+            totalSessions === 0
+              ? 'No sessions yet — start now!'
+              : `${completedMonth} completed this month`
+          }
           icon={<FileText size={20} />}
           iconColor="bg-brand-500/10"
           iconTextColor="text-brand-500"
@@ -210,9 +278,9 @@ export function Dashboard() {
         />
         <MotionCard
           title="Average Score"
-          value={dashboardData?.performanceOverview?.currentScore || 84}
-          suffix="%"
-          description="+6.2% improvement from last week"
+          value={avgScore > 0 ? Math.round(avgScore) : '—'}
+          suffix={avgScore > 0 ? '%' : ''}
+          description={improvementText}
           icon={<TrendingUp size={20} />}
           iconColor="bg-emerald-500/10"
           iconTextColor="text-emerald-500"
@@ -221,9 +289,9 @@ export function Dashboard() {
         />
         <MotionCard
           title="Practice Hours"
-          value={dashboardData?.userSummary?.totalPracticeHours || 18}
-          suffix=" hrs"
-          description="Senior Practice Tier"
+          value={practiceHours > 0 ? practiceHours : '—'}
+          suffix={practiceHours > 0 ? ' hrs' : ''}
+          description={practiceHours === 0 ? 'No practice recorded yet' : userLevel + ' Tier'}
           icon={<Clock size={20} />}
           iconColor="bg-amber-500/10"
           iconTextColor="text-amber-500"
@@ -231,10 +299,10 @@ export function Dashboard() {
           delay={0.16}
         />
         <MotionCard
-          title="Company Readiness"
-          value={dashboardData?.performanceOverview?.bestScore || 88}
-          suffix="%"
-          description="Targeted for FAANG / Tier 1"
+          title="Best Score"
+          value={bestScore > 0 ? Math.round(bestScore) : '—'}
+          suffix={bestScore > 0 ? '%' : ''}
+          description={bestScore > 0 && bestRole ? `Best in: ${bestRole}` : 'Complete an interview to track'}
           icon={<Target size={20} />}
           iconColor="bg-violet-500/10"
           iconTextColor="text-violet-500"
@@ -243,21 +311,23 @@ export function Dashboard() {
         />
       </div>
 
-      {/* ── Charts Row ── */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Score progression */}
-        <motion.div
-          className="lg:col-span-2"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <Card hoverable>
-            <CardHeader>
-              <CardTitle>Score Progression Trend</CardTitle>
-              <CardDescription>Interview performance across historical sessions</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-2">
+      {/* ── Score Progression Chart ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <Card hoverable>
+          <CardHeader>
+            <CardTitle>Score Progression Trend</CardTitle>
+            <CardDescription>
+              {hasChartData
+                ? `Your interview performance across ${chartData.length} session${chartData.length !== 1 ? 's' : ''}`
+                : 'Interview performance across historical sessions'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-2">
+            {hasChartData ? (
               <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
@@ -268,10 +338,11 @@ export function Dashboard() {
                     tickLine={false}
                   />
                   <YAxis
-                    domain={[50, 100]}
+                    domain={[0, 100]}
                     tick={{ fill: '#64748b', fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
+                    tickFormatter={(v) => `${v}%`}
                   />
                   <Tooltip content={<ChartTooltip />} />
                   <Line
@@ -286,42 +357,13 @@ export function Dashboard() {
                   />
                 </LineChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </motion.div>
+            ) : (
+              <EmptyChart />
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
-        {/* Weak skills */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <Card hoverable className="h-full">
-            <CardHeader>
-              <CardTitle>AI Weak Skill Analysis</CardTitle>
-              <CardDescription>Areas requiring focused preparation</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {weakSkills.map((skill, i) => (
-                <ProgressBar
-                  key={skill.name}
-                  label={skill.name}
-                  value={skill.score}
-                  color={skill.color}
-                  delay={0.5 + i * 0.15}
-                />
-              ))}
-              <div className="pt-3 border-t border-ink-100 dark:border-white/[0.06]">
-                <Link to="/interview/company">
-                  <Button variant="secondary" className="w-full text-xs">
-                    Practice Weak Skill Round
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useInView, animate } from 'framer-motion';
 import gsap from 'gsap';
@@ -6,8 +6,8 @@ import Lenis from 'lenis';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   BrainCircuit, ArrowRight, BarChart3, Target, Shield,
-  Sparkles, Zap, TrendingUp, CheckCircle2, ChevronDown, Star,
-  Award, Layers, Cpu, Compass, Sun, Moon
+  Sparkles, Zap, TrendingUp, CheckCircle2, ChevronDown,
+  Sun, Moon
 } from 'lucide-react';
 
 import { HeroCanvas } from '../components/landing/HeroCanvas';
@@ -35,6 +35,90 @@ function AnimatedCounter({ to, suffix = '' }: { to: number; suffix?: string }) {
   return <span ref={ref}>0{suffix}</span>;
 }
 
+// ─── Flip Card Component ──────────────────────────────────────────────────────
+interface FlipCardProps {
+  icon: React.ElementType;
+  title: string;
+  desc: string;
+  details: {
+    headline: string;
+    points: string[];
+    badge: string;
+  };
+}
+
+function FlipCard({ icon: Icon, title, desc, details }: FlipCardProps) {
+  const [flipped, setFlipped] = useState(false);
+
+  return (
+    <div
+      className="group relative h-80 cursor-pointer"
+      style={{ perspective: '1200px' }}
+      onMouseEnter={() => setFlipped(true)}
+      onMouseLeave={() => setFlipped(false)}
+    >
+      <motion.div
+        className="relative w-full h-full"
+        animate={{ rotateY: flipped ? 180 : 0 }}
+        transition={{ duration: 0.65, ease: [0.23, 1, 0.32, 1] }}
+        style={{ transformStyle: 'preserve-3d' }}
+      >
+        {/* ── Front Face ── */}
+        <div
+          className="absolute inset-0 rounded-3xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur-xl p-8 flex flex-col justify-between shadow-soft dark:shadow-card"
+          style={{ backfaceVisibility: 'hidden' }}
+        >
+          {/* Hover shimmer */}
+          <div
+            className="absolute inset-0 rounded-3xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{ background: 'radial-gradient(300px circle at 60% 40%, rgba(99,102,241,0.12), transparent 70%)' }}
+          />
+          <div>
+            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500/10 to-violet-500/10 dark:from-brand-500/20 dark:to-violet-500/20 border border-brand-500/20 dark:border-white/15 text-brand-600 dark:text-neon-cyan shadow-glow-sm">
+              <Icon size={26} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">{title}</h3>
+            <p className="text-sm leading-relaxed text-slate-600 dark:text-ink-400">{desc}</p>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-brand-500 dark:text-brand-400 mt-4 opacity-60">
+            <RotateCcw size={12} />
+            <span>Hover to explore</span>
+          </div>
+        </div>
+
+        {/* ── Back Face ── */}
+        <div
+          className="absolute inset-0 rounded-3xl border border-brand-500/30 dark:border-brand-400/30 bg-gradient-to-br from-brand-600 via-indigo-700 to-violet-700 dark:from-brand-800/90 dark:via-indigo-900/90 dark:to-violet-900/90 backdrop-blur-xl p-8 flex flex-col justify-between shadow-glow-indigo"
+          style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+        >
+          {/* Grain overlay */}
+          <div
+            className="absolute inset-0 rounded-3xl pointer-events-none opacity-[0.04]"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")`,
+              backgroundSize: '160px 160px',
+            }}
+          />
+          <div>
+            <span className="inline-block rounded-full border border-white/30 bg-white/15 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white mb-4">
+              {details.badge}
+            </span>
+            <h4 className="text-lg font-extrabold text-white mb-4 leading-snug">{details.headline}</h4>
+            <ul className="space-y-2">
+              {details.points.map((point, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-white/85 leading-relaxed">
+                  <CheckCircle2 size={13} className="text-emerald-300 mt-0.5 shrink-0" />
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Landing Page ─────────────────────────────────────────────────────────────
 export function Landing() {
   const { theme, toggleTheme } = useTheme();
@@ -43,7 +127,6 @@ export function Landing() {
 
   // Initialize Lenis Smooth Scroll & GSAP Entrance Timeline
   useEffect(() => {
-    // Lenis Smooth Scroll
     const lenis = new Lenis({
       duration: 1.2,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
@@ -56,10 +139,8 @@ export function Landing() {
     }
     requestAnimationFrame(raf);
 
-    // GSAP Sequence Intro Timeline
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: 'power3.out', duration: 1.1 } });
-
       tl.from('.gsap-nav', { y: -30, opacity: 0, delay: 0.2 })
         .from('.gsap-badge', { y: 20, opacity: 0 }, '-=0.6')
         .from('.gsap-title', { y: 35, opacity: 0, duration: 1.3 }, '-=0.8')
@@ -75,36 +156,96 @@ export function Landing() {
     };
   }, []);
 
-  const features = [
+  const features: FlipCardProps[] = [
     {
       icon: Target,
       title: 'AI-Personalized Questions',
       desc: 'Deep analytical model that tailors question sets dynamically based on your target role, resume, and specific company culture.',
+      details: {
+        badge: 'Adaptive Engine',
+        headline: 'Questions built around YOU — not a generic question bank.',
+        points: [
+          'Parses your resume for skills, years of experience, and project domains',
+          'Maps questions to role-level expectations (SDE-1 vs Staff Engineer)',
+          'Adapts difficulty in real-time based on prior answer quality',
+          'Covers DSA, system design, behavioral, and domain-specific areas',
+        ],
+      },
     },
     {
       icon: BarChart3,
       title: 'Real-Time Evaluation Metrics',
       desc: 'Instant 360-degree performance feedback rating communication fluidity, technical depth, problem-solving, and confidence.',
+      details: {
+        badge: 'Live Scoring',
+        headline: 'Know exactly where you stand after every single answer.',
+        points: [
+          'Scores on 5 axes: accuracy, clarity, depth, structure, confidence',
+          'Keyword density and STAR-method adherence analysis',
+          'Benchmarked against real-world pass/fail thresholds at top firms',
+          'Trend graph shows improvement curve across sessions',
+        ],
+      },
     },
     {
       icon: Shield,
       title: 'Simulated High-Stakes Environment',
       desc: 'Authentic web-based video interview simulation with timed responses designed to mirror high-intensity technical rounds.',
+      details: {
+        badge: 'Pressure Mode',
+        headline: 'Real interview pressure. Safe practice environment.',
+        points: [
+          'Countdown timers that match actual FAANG interview windows',
+          'Follow-up clarification rounds simulate real interviewer behavior',
+          'Cognitive-load profiling to detect hesitation and response gaps',
+          'Stress-test mode with back-to-back questions, no breaks',
+        ],
+      },
     },
     {
       icon: Sparkles,
       title: 'Line-by-Line AI Coaching',
       desc: 'Receive optimal answer reformulations, STAR method optimizations, and key metrics to dramatically boost your pass rate.',
+      details: {
+        badge: 'Coaching Engine',
+        headline: 'Every word in your answer is analyzed and improved.',
+        points: [
+          'Sentence-level rewrite suggestions with explanations',
+          'STAR (Situation-Task-Action-Result) structure enforcement',
+          'Detects filler words, passive voice, and vague quantifiers',
+          'Provides model answers from top-performer response patterns',
+        ],
+      },
     },
     {
       icon: TrendingUp,
       title: 'Skill Gap Heatmap',
       desc: 'Pinpoint precise gaps in algorithmic execution, system architecture, or behavioral phrasing with personalized practice rounds.',
+      details: {
+        badge: 'Gap Analysis',
+        headline: 'Visual roadmap of your weakest areas — with a fix plan.',
+        points: [
+          'Heat-mapped skill radar across 12+ engineering domains',
+          'Highlights repeated failure patterns across sessions',
+          'Auto-generates targeted drills for bottom-quartile skills',
+          'Tracks improvement weekly with delta scoring',
+        ],
+      },
     },
     {
       icon: Zap,
       title: 'Sub-Second Turnaround',
       desc: 'Instantaneous evaluation report generation powered by custom high-throughput LLM pipelines for immediate iteration.',
+      details: {
+        badge: 'Speed',
+        headline: 'Evaluate, iterate, and improve — in under a second.',
+        points: [
+          'Custom LLM pipeline with <800ms avg. evaluation latency',
+          'Parallel processing of transcript, tone, and logic simultaneously',
+          'Instant score display without any page reload or wait state',
+          'Supports high-concurrency — no queuing during peak hours',
+        ],
+      },
     },
   ];
 
@@ -121,11 +262,11 @@ export function Landing() {
         ref={heroRef}
         className="relative min-h-screen bg-white dark:bg-[#04060A] text-slate-900 dark:text-white overflow-hidden selection:bg-brand-500/30 transition-colors duration-500"
       >
-        
+
         {/* ── 3D Interactive Multi-Layer Canvas Background ── */}
         <HeroCanvas theme={theme} />
 
-        {/* ── Layer 6: Subtle Noise Grain Texture Overlay ── */}
+        {/* ── Noise Grain Texture Overlay ── */}
         <div
           className="fixed inset-0 pointer-events-none z-10 opacity-[0.025]"
           style={{
@@ -150,7 +291,6 @@ export function Landing() {
             </Link>
 
             <div className="flex items-center gap-4 sm:gap-6">
-              {/* Theme toggle button */}
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
@@ -160,7 +300,6 @@ export function Landing() {
               >
                 {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} className="text-slate-800" />}
               </motion.button>
-
               <Link to="/login">
                 <span className="text-sm font-semibold text-slate-600 hover:text-slate-900 dark:text-ink-300 dark:hover:text-white transition-colors cursor-pointer">
                   Log in
@@ -177,8 +316,7 @@ export function Landing() {
 
         {/* ── Hero Section ── */}
         <section className="relative z-20 pt-20 pb-32 px-6 text-center max-w-6xl mx-auto flex flex-col items-center">
-          
-          {/* Badge */}
+
           <div className="gsap-badge mb-8">
             <div className="inline-flex items-center gap-2.5 rounded-full border border-brand-500/30 bg-brand-500/10 px-5 py-2 text-xs font-semibold tracking-wider text-brand-600 dark:text-neon-cyan backdrop-blur-md shadow-glow-sm">
               <Sparkles size={14} className="text-brand-500 dark:text-brand-400 animate-pulse" />
@@ -186,7 +324,6 @@ export function Landing() {
             </div>
           </div>
 
-          {/* Headline with Animated Shimmer AI */}
           <h1 className="gsap-title text-6xl sm:text-8xl lg:text-[110px] font-black tracking-tight leading-[0.98] text-slate-900 dark:text-white mb-8">
             Master Your Next<br />
             Interview with{' '}
@@ -195,12 +332,10 @@ export function Landing() {
             </span>
           </h1>
 
-          {/* Subtitle */}
           <p className="gsap-desc max-w-2xl text-lg sm:text-xl font-normal leading-relaxed text-slate-600 dark:text-ink-400 mb-12">
             Hyper-personalized AI mock interviews tailored to your exact resume, target company, and technical seniority. Practice under real pressure with line-by-line feedback.
           </p>
 
-          {/* CTA Buttons */}
           <div className="gsap-cta flex flex-wrap items-center justify-center gap-5 mb-16">
             <Link to="/register">
               <MagneticButton variant="primary" className="text-base px-9 py-4">
@@ -214,7 +349,6 @@ export function Landing() {
             </Link>
           </div>
 
-          {/* Trust Highlights */}
           <div className="gsap-cta flex flex-wrap items-center justify-center gap-8 text-xs font-semibold text-slate-500 dark:text-ink-500 uppercase tracking-widest mb-16">
             <span className="flex items-center gap-2">
               <CheckCircle2 size={15} className="text-emerald-500 dark:text-emerald-400" /> Free to Start
@@ -227,7 +361,6 @@ export function Landing() {
             </span>
           </div>
 
-          {/* Scroll Indicator */}
           <div className="gsap-scroll flex flex-col items-center gap-2 text-slate-400 dark:text-ink-500 text-xs tracking-widest uppercase">
             <span>Scroll to Explore</span>
             <ChevronDown size={16} className="animate-bounce text-brand-500 dark:text-brand-400" />
@@ -252,7 +385,7 @@ export function Landing() {
           </div>
         </section>
 
-        {/* ── Feature Cards Grid with 3D Tilt ── */}
+        {/* ── Feature Flip Cards Grid ── */}
         <section className="relative z-20 py-32 px-6 max-w-7xl mx-auto">
           <div className="text-center max-w-3xl mx-auto mb-20 space-y-4">
             <span className="inline-block rounded-full border border-brand-500/20 bg-brand-500/10 dark:border-white/10 dark:bg-white/5 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-brand-600 dark:text-brand-300">
@@ -264,26 +397,16 @@ export function Landing() {
             <p className="text-base sm:text-lg text-slate-600 dark:text-ink-400">
               Every element simulates the exact pressure, structure, and algorithmic evaluation criteria used by tier-1 tech firms.
             </p>
+            <p className="text-xs text-slate-400 dark:text-ink-500 flex items-center justify-center gap-1.5 pt-2">
+              <RotateCcw size={12} />
+              Hover any card to reveal deep feature details
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((f) => {
-              const Icon = f.icon;
-              return (
-                <TiltCard key={f.title} className="flex flex-col justify-between h-full border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03]">
-                  <div>
-                    <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500/10 to-violet-500/10 dark:from-brand-500/20 dark:to-violet-500/20 border border-brand-500/20 dark:border-white/15 text-brand-600 dark:text-neon-cyan shadow-glow-sm">
-                      <Icon size={26} />
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">{f.title}</h3>
-                    <p className="text-sm leading-relaxed text-slate-600 dark:text-ink-400">{f.desc}</p>
-                  </div>
-                  <div className="mt-8 flex items-center gap-2 text-xs font-semibold text-brand-600 dark:text-brand-400 group-hover:text-brand-500 transition-colors">
-                    Learn More <ArrowRight size={14} />
-                  </div>
-                </TiltCard>
-              );
-            })}
+          <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+            {features.map((f) => (
+              <FlipCard key={f.title} {...f} />
+            ))}
           </div>
         </section>
 

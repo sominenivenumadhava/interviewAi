@@ -60,6 +60,62 @@ export function Room() {
   const [answer, setAnswer] = useState('');
 
   const [isVideoOff, setIsVideoOff] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+
+  // WebRTC Camera Feed Stream
+  useEffect(() => {
+    if (isVideoOff) {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+      return;
+    }
+
+    let isMounted = true;
+    setCameraError(null);
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 } } })
+        .then((stream) => {
+          if (!isMounted) {
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+          }
+          mediaStreamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        })
+        .catch((err) => {
+          console.warn('Webcam permission denied or error:', err);
+          if (isMounted) {
+            setCameraError('Camera access not granted');
+          }
+        });
+    } else {
+      setCameraError('Webcam not supported in browser');
+    }
+
+    return () => {
+      isMounted = false;
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+    };
+  }, [isVideoOff]);
+
+  // Ensure camera feed srcObject is set stably without blinking on 1s timer ticks
+  useEffect(() => {
+    if (videoRef.current && mediaStreamRef.current && videoRef.current.srcObject !== mediaStreamRef.current) {
+      videoRef.current.srcObject = mediaStreamRef.current;
+    }
+  });
+
   const [showHints, setShowHints] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -237,13 +293,13 @@ export function Room() {
   // Text Streaming Effect for Question Presentation
   useEffect(() => {
     if (!currentQuestion?.question) return;
-    setDisplayedText('');
-    let index = 0;
     const text = currentQuestion.question;
+    setDisplayedText('');
+    let i = 0;
     const interval = setInterval(() => {
-      setDisplayedText((prev) => prev + text.charAt(index));
-      index++;
-      if (index >= text.length) {
+      i++;
+      setDisplayedText(text.slice(0, i));
+      if (i >= text.length) {
         clearInterval(interval);
       }
     }, 20);
@@ -342,6 +398,13 @@ export function Room() {
 
       const totalQ = selectedConfig.numberOfQuestions || 5;
       if (currentQIndex >= totalQ) {
+        try {
+          if (sessionId) {
+            await apiClient.post(API_ENDPOINTS.INTERVIEW.COMPLETE(sessionId));
+          }
+        } catch (e) {
+          console.warn('Failed to call complete interview endpoint:', e);
+        }
         endSessionState();
         navigate('/evaluation');
         return;
@@ -416,31 +479,66 @@ export function Room() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-ink-950 text-white font-sans">
       {/* Top Bar */}
-      <div className="flex h-16 items-center justify-between border-b border-ink-800 px-6 bg-ink-900/50 backdrop-blur-md">
-        <div className="flex items-center gap-4">
-          <div className="rounded-lg bg-brand-600 px-3.5 py-1 text-sm font-semibold tracking-wide">
-            ⏱ {formatTime(timeLeft)}
+      <div className="flex h-16 items-center justify-between border-b border-ink-800/80 px-6 bg-ink-900/80 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          {/* Timer Pill */}
+          <div className="flex items-center gap-1.5 rounded-xl bg-brand-500/20 border border-brand-500/30 px-3 py-1 text-sm font-bold font-mono text-brand-300 shadow-sm">
+            <span>⏱</span>
+            <span>{formatTime(timeLeft)}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-ink-300">
-            <span className="font-bold text-white">{selectedCompany}</span>
-            <span>•</span>
-            <span>{selectedRole}</span>
-            <span>•</span>
-            <Badge variant="outline" className="text-xs">
-              {selectedConfig.interviewType}
-            </Badge>
-            <span>•</span>
-            <Badge
-              variant={
-                currentDifficulty === 'HARD'
-                  ? 'danger'
-                  : currentDifficulty === 'MEDIUM'
-                  ? 'warning'
-                  : 'secondary'
-              }
+
+          <div className="h-4 w-px bg-ink-800" />
+
+          {/* Clean Interactive Breadcrumb Flow */}
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              onClick={() => navigate('/interview/company')}
+              className="font-semibold text-white hover:text-brand-300 hover:underline transition-colors focus:outline-none"
+              title="Change Company Target"
             >
-              {currentDifficulty} Adaptive
-            </Badge>
+              {selectedCompany}
+            </button>
+
+            <span className="text-ink-500 font-bold">→</span>
+
+            <button
+              onClick={() => navigate('/interview/role')}
+              className="font-semibold text-white hover:text-brand-300 hover:underline transition-colors focus:outline-none"
+              title="Change Target Role"
+            >
+              {selectedRole}
+            </button>
+
+            <span className="text-ink-500 font-bold">→</span>
+
+            <button
+              onClick={() => navigate('/interview/config')}
+              className="font-semibold text-white hover:text-brand-300 hover:underline transition-colors focus:outline-none"
+              title="Change Interview Type"
+            >
+              {selectedConfig.interviewType
+                ? selectedConfig.interviewType
+                    .split(/[_ ]+/)
+                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                    .join(' ')
+                : 'Technical'}
+            </button>
+
+            <span className="text-ink-500 font-bold">→</span>
+
+            <button
+              onClick={() => navigate('/interview/config')}
+              className={`font-semibold capitalize hover:underline transition-colors focus:outline-none ${
+                currentDifficulty === 'HARD'
+                  ? 'text-rose-400 hover:text-rose-300'
+                  : currentDifficulty === 'MEDIUM'
+                  ? 'text-amber-400 hover:text-amber-300'
+                  : 'text-emerald-400 hover:text-emerald-300'
+              }`}
+              title="Change Difficulty"
+            >
+              {currentDifficulty.toLowerCase()}
+            </button>
           </div>
         </div>
 
@@ -448,8 +546,15 @@ export function Room() {
           variant="danger"
           size="sm"
           className="gap-2 shadow"
-          onClick={() => {
+          onClick={async () => {
             if (isRecording) stopRecording();
+            if (sessionId) {
+              try {
+                await apiClient.post(API_ENDPOINTS.INTERVIEW.COMPLETE(sessionId));
+              } catch (e) {
+                console.warn('Failed to call complete interview endpoint:', e);
+              }
+            }
             endSessionState();
             navigate('/evaluation');
           }}
@@ -509,10 +614,10 @@ export function Room() {
             </div>
 
             {/* Candidate User Video Stage */}
-            <div className="relative overflow-hidden rounded-2xl bg-ink-900 border border-ink-800 flex flex-col justify-between p-6">
+            <div className="relative overflow-hidden rounded-2xl bg-ink-900 border border-ink-800 flex flex-col justify-between p-6 min-h-[300px]">
               <div className="flex items-center justify-between z-10">
-                <span className="text-xs font-semibold text-ink-400 uppercase">Candidate Feed</span>
-                <span className="text-xs text-ink-400 flex items-center gap-1">
+                <span className="text-xs font-semibold text-ink-300 uppercase tracking-wider">Candidate Feed</span>
+                <span className="text-xs text-ink-300 flex items-center gap-1">
                   {isRecording ? (
                     <>
                       <Radio size={12} className="animate-pulse text-red-500" />
@@ -524,30 +629,37 @@ export function Room() {
                 </span>
               </div>
 
-              <div className="my-auto flex flex-col items-center justify-center">
+              {/* WebRTC Real Camera Stream / Placeholder Container */}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 overflow-hidden">
                 {isVideoOff ? (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-ink-800 text-2xl text-ink-400">
-                    👤
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-ink-800 text-3xl text-ink-400">
+                      👤
+                    </div>
+                    <span className="text-xs text-ink-400">Camera Off</span>
+                  </div>
+                ) : cameraError ? (
+                  <div className="flex flex-col items-center gap-2 text-center p-4">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-950/60 border border-amber-500/30 text-2xl text-amber-400">
+                      📷
+                    </div>
+                    <span className="text-xs text-amber-300 font-medium">{cameraError}</span>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center space-y-2">
-                    <div className="h-24 w-24 rounded-full border-2 border-brand-500/40 bg-ink-800/80 flex items-center justify-center relative">
-                      <span className="text-3xl">👨‍💻</span>
-                      {isRecording && (
-                        <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white text-[10px] animate-pulse font-bold shadow">
-                          REC
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-xs text-brand-400 font-medium">Camera Feed Live</span>
-                  </div>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover transform -scale-x-100"
+                  />
                 )}
               </div>
 
-              <div className="z-10 flex items-center justify-between rounded-xl bg-black/60 p-3 text-xs backdrop-blur-md border border-white/10">
-                <span className="font-medium text-ink-200">You (Candidate)</span>
+              <div className="z-10 flex items-center justify-between rounded-xl bg-black/70 p-3 text-xs backdrop-blur-md border border-white/10 mt-auto">
+                <span className="font-semibold text-white">You (Candidate)</span>
                 {validationResult && (
-                  <span className="text-emerald-400 font-semibold">
+                  <span className="text-emerald-400 font-bold">
                     Live Rating: {validationResult.score}/10
                   </span>
                 )}
@@ -557,41 +669,44 @@ export function Room() {
 
           {/* Audio / Video Control Buttons */}
           <div className="flex items-center justify-center gap-4">
-            <Button
-              variant={isRecording ? 'danger' : 'secondary'}
-              size="lg"
-              className={`rounded-full px-6 h-12 shadow-lg transition-all ${
-                isRecording ? 'ring-4 ring-red-500/30 animate-pulse' : ''
-              }`}
+            <button
               disabled={isConnecting}
               onClick={handleMicToggle}
+              className={`flex items-center justify-center gap-2 rounded-full px-6 h-12 text-sm font-semibold shadow-lg transition-all ${
+                isRecording
+                  ? 'bg-red-600 hover:bg-red-700 text-white ring-4 ring-red-500/30 animate-pulse'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40'
+              } disabled:opacity-50`}
             >
               {isConnecting ? (
                 <>
-                  <Loader2 size={18} className="animate-spin mr-2" />
-                  Connecting Deepgram...
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>Connecting Deepgram...</span>
                 </>
               ) : isRecording ? (
                 <>
-                  <MicOff size={20} className="mr-2" />
-                  Stop Recording
+                  <MicOff size={20} />
+                  <span>Stop Recording</span>
                 </>
               ) : (
                 <>
-                  <Mic size={20} className="mr-2 text-emerald-400" />
-                  Start Speaking (Deepgram STT)
+                  <Mic size={20} />
+                  <span>Start Speaking (Deepgram STT)</span>
                 </>
               )}
-            </Button>
+            </button>
 
-            <Button
-              variant={isVideoOff ? 'danger' : 'secondary'}
-              size="icon"
-              className="rounded-full h-12 w-12 shadow"
+            <button
               onClick={() => setIsVideoOff(!isVideoOff)}
+              className={`flex items-center justify-center rounded-full h-12 w-12 text-white shadow-md transition-all ${
+                isVideoOff
+                  ? 'bg-red-600/90 hover:bg-red-600 border border-red-500/50'
+                  : 'bg-ink-800 hover:bg-ink-700 border border-ink-700'
+              }`}
+              title={isVideoOff ? 'Turn Camera On' : 'Turn Camera Off'}
             >
               {isVideoOff ? <VideoOff size={20} /> : <Video size={20} />}
-            </Button>
+            </button>
           </div>
         </div>
 
@@ -714,6 +829,7 @@ export function Room() {
           {/* Bottom Action Submit Button */}
           <div className="border-t border-ink-800 p-6 bg-ink-950 space-y-2">
             <Button
+              variant="gradient"
               className="w-full gap-2 shadow-lg h-11 text-sm font-semibold"
               disabled={evaluating || validatingAnswer}
               onClick={handleSubmitAnswer}
