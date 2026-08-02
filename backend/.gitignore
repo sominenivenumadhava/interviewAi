@@ -92,7 +92,6 @@ application-local.properties
 *.sqlite3
 
 # Docker
-.dockerignore
 docker-compose.override.yml
 
 # Generated files
