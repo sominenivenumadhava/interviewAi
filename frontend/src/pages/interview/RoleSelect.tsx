@@ -32,7 +32,7 @@ export function RoleSelect() {
           Select Your Role
         </h1>
         <p className="mt-2 text-ink-500 dark:text-ink-400">
-          What position are you interviewing for?
+          Curated role catalog — pick a position or enter your own.
         </p>
       </div>
 

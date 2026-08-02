@@ -50,7 +50,7 @@ export function CompanySelect() {
           Choose Your Target Company
         </h1>
         <p className="mx-auto max-w-2xl text-ink-500 dark:text-ink-400">
-          Search over 150+ tech companies. We tailor AI interviewer personality, coding expectations, and system design difficulty to match their hiring bar.
+          Curated company catalog. We tailor AI interviewer personality, coding expectations, and system design difficulty to match their hiring bar.
         </p>
       </div>
 

@@ -1,6 +1,10 @@
 /**
  * HTTP API client with automatic token management and request/response interceptors.
  * Handles authentication, retry logic, and error handling.
+ *
+ * VITE_API_BASE_URL should be the API origin only, e.g. `http://localhost:8082`
+ * WITHOUT the `/api/v1` path prefix. Endpoint constants already include `/api/v1/...`.
+ * If a base URL accidentally ends with `/api/v1`, it is stripped to avoid double prefixes.
  */
 
 export interface ApiFieldError {
@@ -34,6 +38,15 @@ export interface RequestConfig extends RequestInit {
 
 const AUTH_REFRESH_ENDPOINT = '/api/v1/auth/refresh';
 
+/** Normalize API origin: strip trailing slash and accidental `/api/v1` suffix. */
+function normalizeApiBaseURL(raw: string): string {
+  let base = (raw || '').trim().replace(/\/+$/, '');
+  if (base.endsWith('/api/v1')) {
+    base = base.slice(0, -'/api/v1'.length).replace(/\/+$/, '');
+  }
+  return base;
+}
+
 class ApiClient {
   private baseURL: string;
   private defaultTimeout: number = 15000; // 15 seconds
@@ -43,9 +56,11 @@ class ApiClient {
 
   constructor() {
     // In development: use empty string so all /api/* calls go through Vite's proxy to port 8082.
-    // In production: read VITE_API_BASE_URL from environment.
+    // In production: read VITE_API_BASE_URL from environment (origin only — no /api/v1).
     if (import.meta.env.PROD) {
-      this.baseURL = import.meta.env.VITE_API_BASE_URL || 'https://api.interviai.com';
+      this.baseURL = normalizeApiBaseURL(
+        import.meta.env.VITE_API_BASE_URL || 'https://api.interviai.com'
+      );
     } else {
       // Empty base URL = relative paths → Vite proxy handles CORS automatically
       this.baseURL = '';
@@ -421,6 +436,7 @@ export const API_ENDPOINTS = {
     CHANGE_PASSWORD: '/api/v1/users/change-password',
     VERIFY_EMAIL: '/api/v1/users/verify-email',
     PREFERENCES: '/api/v1/users/preferences',
+    ADMIN_STATISTICS: '/api/v1/users/admin/statistics',
   },
   INTERVIEW: {
     CREATE: '/api/v1/interviews',

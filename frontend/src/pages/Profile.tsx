@@ -27,6 +27,13 @@ export function Profile() {
   const [notifEmails, setNotifEmails] = useState(user?.notificationEmailsEnabled ?? true);
   const [marketingEmails, setMarketingEmails] = useState(user?.marketingEmailsEnabled ?? false);
 
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState(false);
+
   const displayName = user
     ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'User'
     : '';
@@ -48,6 +55,43 @@ export function Profile() {
       await apiClient.put(API_ENDPOINTS.USER.PREFERENCES, updates);
     } catch (err) {
       console.warn('Failed to save preferences:', err);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError('');
+    setPwSuccess(false);
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      setPwError('Please fill in all password fields.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPwError('New password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPwError('New passwords do not match.');
+      return;
+    }
+
+    setPwLoading(true);
+    try {
+      await apiClient.post(API_ENDPOINTS.USER.CHANGE_PASSWORD, {
+        currentPassword,
+        newPassword,
+        confirmNewPassword,
+      });
+      setPwSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setTimeout(() => setPwSuccess(false), 3000);
+    } catch (err: any) {
+      setPwError(err?.message || 'Failed to change password.');
+    } finally {
+      setPwLoading(false);
     }
   };
 
@@ -163,28 +207,66 @@ export function Profile() {
                   <CardTitle>Change Password</CardTitle>
                   <CardDescription>Update your password to keep your account secure.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1.5">
-                      Current Password
-                    </label>
-                    <Input type="password" icon={<Lock size={15} />} placeholder="••••••••" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1.5">
-                      New Password
-                    </label>
-                    <Input type="password" icon={<Lock size={15} />} placeholder="Min 8 characters" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1.5">
-                      Confirm New Password
-                    </label>
-                    <Input type="password" icon={<Lock size={15} />} placeholder="Repeat new password" />
-                  </div>
-                  <div className="flex justify-end pt-2">
-                    <Button variant="secondary">Update Password</Button>
-                  </div>
+                <CardContent>
+                  <form onSubmit={handleChangePassword} className="space-y-4">
+                    {pwError && (
+                      <div className="rounded-xl border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3 py-2 text-sm text-rose-700 dark:text-rose-300">
+                        {pwError}
+                      </div>
+                    )}
+                    {pwSuccess && (
+                      <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+                        Password updated successfully.
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1.5">
+                        Current Password
+                      </label>
+                      <Input
+                        type="password"
+                        icon={<Lock size={15} />}
+                        placeholder="••••••••"
+                        value={currentPassword}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrentPassword(e.target.value)}
+                        autoComplete="current-password"
+                        disabled={pwLoading}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1.5">
+                        New Password
+                      </label>
+                      <Input
+                        type="password"
+                        icon={<Lock size={15} />}
+                        placeholder="Min 8 characters"
+                        value={newPassword}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPassword(e.target.value)}
+                        autoComplete="new-password"
+                        disabled={pwLoading}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1.5">
+                        Confirm New Password
+                      </label>
+                      <Input
+                        type="password"
+                        icon={<Lock size={15} />}
+                        placeholder="Repeat new password"
+                        value={confirmNewPassword}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmNewPassword(e.target.value)}
+                        autoComplete="new-password"
+                        disabled={pwLoading}
+                      />
+                    </div>
+                    <div className="flex justify-end pt-2">
+                      <Button type="submit" variant="secondary" isLoading={pwLoading} disabled={pwLoading} success={pwSuccess}>
+                        {pwSuccess ? 'Updated!' : 'Update Password'}
+                      </Button>
+                    </div>
+                  </form>
                 </CardContent>
               </Card>
             </motion.div>

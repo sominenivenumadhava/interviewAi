@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, Search, Bookmark, History, Settings, Menu, X } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface DashboardSidebarProps {
   activeTab: string;
@@ -8,6 +9,18 @@ interface DashboardSidebarProps {
 
 export function DashboardSidebar({ activeTab, setActiveTab }: DashboardSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { user } = useAuth();
+
+  const displayName = user
+    ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'User'
+    : 'Guest';
+  const email = user?.email || '';
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || '')
+    .join('') || 'U';
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -65,11 +78,13 @@ export function DashboardSidebar({ activeTab, setActiveTab }: DashboardSidebarPr
           <div className="border-t border-ink-150 dark:border-ink-850 pt-4 mt-6">
             <div className="flex items-center gap-3 px-4">
               <div className="w-8 h-8 rounded-full bg-ink-200 dark:bg-ink-800 flex items-center justify-center font-bold text-xs">
-                US
+                {initials}
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-ink-900 dark:text-ink-100 truncate">Demo User</div>
-                <div className="text-[10px] text-ink-400 truncate">demo@interviai.com</div>
+                <div className="text-xs font-bold text-ink-900 dark:text-ink-100 truncate">{displayName}</div>
+                {email && (
+                  <div className="text-[10px] text-ink-400 truncate">{email}</div>
+                )}
               </div>
             </div>
           </div>

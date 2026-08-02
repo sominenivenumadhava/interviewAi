@@ -77,17 +77,29 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
       streamRef.current = stream;
 
       // 2. Fetch Deepgram Token Config from Backend
-      let tokenKey = 'mock-key';
+      let tokenKey = '';
       let wsUrl = 'wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&interim_results=true&punctuate=true';
+      let speechAvailable = true;
 
       try {
         const tokenRes = await apiClient.get<any>(API_ENDPOINTS.SPEECH.TOKEN);
-        if (tokenRes.data && tokenRes.data.key) {
-          tokenKey = tokenRes.data.key;
-          if (tokenRes.data.url) wsUrl = tokenRes.data.url;
+        const tokenData = tokenRes?.data ?? tokenRes;
+
+        // available===false → skip Deepgram, use browser STT (not an error)
+        if (tokenData && tokenData.available === false) {
+          speechAvailable = false;
+        } else if (tokenData && tokenData.key) {
+          tokenKey = tokenData.key;
+          if (tokenData.url) wsUrl = tokenData.url;
         }
       } catch (e) {
-        console.warn('Backend speech token fetch warning, connecting using browser stream:', e);
+        console.warn('Backend speech token fetch warning, using browser STT:', e);
+        speechAvailable = false;
+      }
+
+      if (!speechAvailable || !tokenKey) {
+        startBrowserWebSpeech(stream);
+        return;
       }
 
       // 3. Connect to WebSocket

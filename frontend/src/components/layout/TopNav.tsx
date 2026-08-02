@@ -63,8 +63,10 @@ export function TopNav() {
   const location = useLocation();
   const [isProfileOpen, setIsProfileOpen]     = useState(false);
   const [isInterviewsOpen, setIsInterviewsOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const profileRef   = useRef<HTMLDivElement>(null);
   const interviewsRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -74,6 +76,9 @@ export function TopNav() {
       }
       if (interviewsRef.current && !interviewsRef.current.contains(event.target as Node)) {
         setIsInterviewsOpen(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -215,14 +220,38 @@ export function TopNav() {
           </motion.button>
 
           {/* Notifications */}
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-ink-500 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/8 transition-colors"
-            aria-label="Notifications"
-          >
-            <Bell size={17} />
-          </motion.button>
+          <div className="relative" ref={notificationsRef}>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-ink-500 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/8 transition-colors"
+              aria-label="Notifications"
+              aria-expanded={isNotificationsOpen}
+            >
+              <Bell size={17} />
+            </motion.button>
+
+            <AnimatePresence>
+              {isNotificationsOpen && (
+                <motion.div
+                  variants={dropdownVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  transition={dropdownTransition}
+                  className="absolute right-0 mt-2 w-64 origin-top-right rounded-2xl border border-ink-100 dark:border-white/[0.08] bg-white dark:bg-obsidian-900 p-3 shadow-lift dark:shadow-card"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2 px-1">
+                    Notifications
+                  </p>
+                  <p className="px-2 py-6 text-center text-sm text-ink-500 dark:text-ink-400">
+                    No notifications
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* Profile Dropdown */}
           <div className="relative" ref={profileRef}>

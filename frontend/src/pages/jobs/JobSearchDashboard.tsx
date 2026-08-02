@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Sun, Moon, User as UserIcon, SlidersHorizontal, ArrowLeft, RefreshCw } from 'lucide-react';
-import { useTheme } from '../../contexts/ThemeContext';
 import { DashboardSidebar } from '../../components/jobs/DashboardSidebar';
 import { JobSearchForm } from '../../components/jobs/JobSearchForm';
 import { SearchProgress } from '../../components/jobs/SearchProgress';
@@ -23,8 +21,6 @@ import {
 } from '../../services/jobSearchApi';
 
 export function JobSearchDashboard() {
-  const { theme, toggleTheme } = useTheme();
-
   // Navigation / Tabs state
   const [activeTab, setActiveTab] = useState('find-jobs');
 
@@ -285,26 +281,13 @@ export function JobSearchDashboard() {
       {/* Main Panel Content */}
       <main className="flex-1 bg-ink-50 dark:bg-ink-950 px-4 py-8 sm:px-6 lg:px-8 space-y-6 overflow-hidden">
         
-        {/* Header toolbar */}
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-ink-200 dark:border-ink-800">
           <div>
             <h1 className="text-3xl font-black text-ink-900 dark:text-ink-100">Find Your Next Opportunity</h1>
             <p className="text-sm text-ink-500 dark:text-ink-400 mt-1.5">
               Search LinkedIn job listings by designation, location, experience and work preference.
             </p>
-          </div>
-
-          <div className="flex items-center gap-3 self-end sm:self-auto">
-            <button className="p-2 border border-ink-200 dark:border-ink-800 rounded-xl hover:bg-ink-100 dark:hover:bg-ink-800 text-ink-600 dark:text-ink-400 transition-colors focus:outline-none">
-              <Bell className="w-5 h-5" />
-            </button>
-            
-            <button 
-              onClick={toggleTheme}
-              className="p-2 border border-ink-200 dark:border-ink-800 rounded-xl hover:bg-ink-100 dark:hover:bg-ink-800 text-ink-600 dark:text-ink-400 transition-colors focus:outline-none"
-            >
-              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
           </div>
         </div>
 
