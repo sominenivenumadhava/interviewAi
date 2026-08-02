@@ -131,6 +131,9 @@ public class EvaluationServiceImpl implements EvaluationService {
             
             // Get AI-powered skill gap analysis
             String analysisJson = aiService.analyzeSkillGap(userSkills, targetRole).block();
+            if (analysisJson == null || analysisJson.isBlank()) {
+                throw new IllegalStateException("AI returned empty skill-gap analysis");
+            }
             Map<String, Object> analysisData = objectMapper.readValue(analysisJson, Map.class);
             
             // Build response from AI analysis
@@ -140,8 +143,28 @@ public class EvaluationServiceImpl implements EvaluationService {
             response.setPerformanceTrends(getPerformanceTrends(userId, 10));
             
         } catch (Exception e) {
-            log.error("Error generating skill gap analysis: {}", e.getMessage());
-            throw new RuntimeException("Failed to generate skill gap analysis", e);
+            log.warn("Skill gap AI analysis unavailable for user {}: {}. Returning empty analysis.", userId, e.getMessage());
+            // Honest empty response — do not invent skill gaps
+            SkillGapAnalysisResponse.SkillsMatching emptyMatching = new SkillGapAnalysisResponse.SkillsMatching();
+            emptyMatching.setMatchedSkills(List.of());
+            emptyMatching.setSkillGaps(List.of());
+            emptyMatching.setMatchPercentage(0.0);
+            emptyMatching.setCategoryMatchPercentages(Map.of());
+            response.setSkillsMatching(emptyMatching);
+            SkillGapAnalysisResponse.LearningRecommendations emptyRecs = new SkillGapAnalysisResponse.LearningRecommendations();
+            emptyRecs.setImmediateActions(List.of());
+            emptyRecs.setShortTermGoals(List.of());
+            emptyRecs.setLongTermGoals(List.of());
+            emptyRecs.setEstimatedWeeksToCloseGap(null);
+            response.setLearningRecommendations(emptyRecs);
+            response.setLearningRoadmap(List.of());
+            response.setOverallReadiness(0.0);
+            response.setReadinessLevel("NEEDS_PREPARATION");
+            try {
+                response.setPerformanceTrends(getPerformanceTrends(userId, 10));
+            } catch (Exception trendsEx) {
+                log.debug("Performance trends unavailable: {}", trendsEx.getMessage());
+            }
         }
         
         return response;

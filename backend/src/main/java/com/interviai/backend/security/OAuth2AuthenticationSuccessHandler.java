@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @Component
 @RequiredArgsConstructor
@@ -38,11 +40,16 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
     protected String determineTargetUrl(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
-        
+
+        // Align JWT role claim with password-login (USER / ADMIN), not ROLE_USER
+        String role = userPrincipal.getUser().getRole() != null
+                ? userPrincipal.getUser().getRole().name()
+                : "USER";
+
         String accessToken = jwtService.generateAccessToken(
                 userPrincipal.getUser().getId(),
                 userPrincipal.getUser().getEmail(),
-                "ROLE_" + userPrincipal.getUser().getRole().name()
+                role
         );
 
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(
@@ -52,10 +59,17 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                 null
         );
 
+        // Put tokens in the URL hash fragment so they are not sent to servers via Referer/query logs
+        String fragment = String.format(
+                "accessToken=%s&refreshToken=%s&expiresIn=%s",
+                URLEncoder.encode(accessToken, StandardCharsets.UTF_8),
+                URLEncoder.encode(refreshToken.getToken(), StandardCharsets.UTF_8),
+                jwtService.getAccessTokenValidity()
+        );
+
         return UriComponentsBuilder.fromUriString(frontendUrl + "/auth/callback")
-                .queryParam("accessToken", accessToken)
-                .queryParam("refreshToken", refreshToken.getToken())
-                .queryParam("expiresIn", jwtService.getAccessTokenValidity())
-                .build().toUriString();
+                .fragment(fragment)
+                .build()
+                .toUriString();
     }
 }

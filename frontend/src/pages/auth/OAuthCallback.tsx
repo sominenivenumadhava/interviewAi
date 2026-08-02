@@ -7,20 +7,31 @@ export function OAuthCallback() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const accessToken = searchParams.get('accessToken');
-    const refreshToken = searchParams.get('refreshToken');
+    const hashParams = new URLSearchParams(
+      window.location.hash.startsWith('#')
+        ? window.location.hash.slice(1)
+        : window.location.hash
+    );
+
+    // Prefer hash fragment (secure) — fall back to query for older redirects
+    const accessToken =
+      hashParams.get('accessToken') || searchParams.get('accessToken');
+    const refreshToken =
+      hashParams.get('refreshToken') || searchParams.get('refreshToken');
 
     if (accessToken && refreshToken) {
-      // Store tokens temporarily so apiClient can use them
       localStorage.setItem('interviai_access_token', accessToken);
       localStorage.setItem('interviai_refresh_token', refreshToken);
 
-      // Fetch user profile
+      // Clear tokens from the address bar
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+
       apiClient.get(API_ENDPOINTS.USER.PROFILE)
         .then(response => {
           if (response.data) {
             localStorage.setItem('interviai_user', JSON.stringify(response.data));
-            // Force a full reload to dashboard to initialize AuthContext properly
             window.location.href = '/dashboard';
           } else {
             console.error('Failed to fetch user profile');
@@ -39,7 +50,7 @@ export function OAuthCallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-ink-50 dark:bg-ink-950">
       <div className="text-center">
-        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status"></div>
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent align-[-0.125em]" role="status"></div>
         <p className="mt-4 text-ink-600 dark:text-ink-400">Authenticating...</p>
       </div>
     </div>

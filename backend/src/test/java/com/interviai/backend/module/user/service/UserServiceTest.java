@@ -89,7 +89,7 @@ class UserServiceTest {
     @DisplayName("Should register user successfully with valid data")
     void shouldRegisterUserSuccessfully() {
         // Given
-        when(userRepository.existsByEmail(validRegisterRequest.getEmail())).thenReturn(false);
+        when(userRepository.findByEmail(validRegisterRequest.getEmail())).thenReturn(Optional.empty());
         when(userRepository.existsByUsername(anyString())).thenReturn(false);
         when(userMapper.toEntity(validRegisterRequest)).thenReturn(mockUser);
         when(passwordEncoder.encode(validRegisterRequest.getPassword())).thenReturn("hashedPassword");
@@ -108,7 +108,7 @@ class UserServiceTest {
         assertFalse(result.getEmailVerified());
         assertEquals(User.UserRole.USER, result.getRole());
 
-        verify(userRepository).existsByEmail(validRegisterRequest.getEmail());
+        verify(userRepository).findByEmail(validRegisterRequest.getEmail());
         verify(userRepository).existsByUsername(anyString());
         verify(passwordEncoder).encode(validRegisterRequest.getPassword());
         verify(userRepository).save(any(User.class));
@@ -118,8 +118,12 @@ class UserServiceTest {
     @Test
     @DisplayName("Should throw exception when email already exists")
     void shouldThrowExceptionWhenEmailAlreadyExists() {
-        // Given
-        when(userRepository.existsByEmail(validRegisterRequest.getEmail())).thenReturn(true);
+        // Given — registration uses findByEmail (not existsByEmail) to support OAuth password set
+        User existing = new User();
+        existing.setId(UUID.randomUUID());
+        existing.setEmail(validRegisterRequest.getEmail());
+        existing.setPasswordHash("already-hashed");
+        when(userRepository.findByEmail(validRegisterRequest.getEmail())).thenReturn(Optional.of(existing));
 
         // When & Then
         ValidationException exception = assertThrows(
@@ -128,7 +132,7 @@ class UserServiceTest {
         );
 
         assertTrue(exception.getMessage().contains("email"));
-        verify(userRepository).existsByEmail(validRegisterRequest.getEmail());
+        verify(userRepository).findByEmail(validRegisterRequest.getEmail());
         verify(userRepository, never()).save(any(User.class));
     }
 
@@ -136,7 +140,7 @@ class UserServiceTest {
     @DisplayName("Should throw exception when username already exists")
     void shouldThrowExceptionWhenUsernameAlreadyExists() {
         // Given
-        when(userRepository.existsByEmail(validRegisterRequest.getEmail())).thenReturn(false);
+        when(userRepository.findByEmail(validRegisterRequest.getEmail())).thenReturn(Optional.empty());
         when(userRepository.existsByUsername(anyString())).thenReturn(true);
 
         // When & Then
@@ -146,7 +150,7 @@ class UserServiceTest {
         );
 
         assertTrue(exception.getMessage().contains("username"));
-        verify(userRepository).existsByEmail(validRegisterRequest.getEmail());
+        verify(userRepository).findByEmail(validRegisterRequest.getEmail());
         verify(userRepository).existsByUsername(anyString());
         verify(userRepository, never()).save(any(User.class));
     }
