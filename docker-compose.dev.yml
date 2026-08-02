@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Dev infrastructure only (Postgres + Redis + pgAdmin).
 # Host apps (Spring Boot / Vite) connect with DB_PORT=5433 (mapped from container 5432).
 # Example: export DB_PORT=5433  (or set in .env — see .env.template)

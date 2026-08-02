@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Production-oriented stack. Copy .env.template → .env and set JWT_SECRET (required).
 services:
   postgres:

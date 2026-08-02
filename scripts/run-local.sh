@@ -60,7 +60,30 @@ export JWT_SECRET="${JWT_SECRET:-local-dev-only-jwt-secret-do-not-use-in-prod-40
 mkdir -p "$ROOT/.local-run"
 
 echo -e "${CYAN}▶ Starting Postgres + Redis (Docker)…${NC}"
-docker compose -f docker-compose.dev.yml up -d postgres redis
+# Reuse containers left over from an earlier clone/run (same fixed names).
+ensure_container() {
+  local name="$1"
+  if docker ps -a --format '{{.Names}}' | grep -qx "$name"; then
+    if docker ps --format '{{.Names}}' | grep -qx "$name"; then
+      echo "  $name already running"
+    else
+      echo "  starting existing $name"
+      docker start "$name" >/dev/null
+    fi
+    return 0
+  fi
+  return 1
+}
+
+if ensure_container interviai-postgres-dev && ensure_container interviai-redis-dev; then
+  :
+elif ensure_container interviai-postgres-dev; then
+  docker compose -f docker-compose.dev.yml up -d redis
+elif ensure_container interviai-redis-dev; then
+  docker compose -f docker-compose.dev.yml up -d postgres
+else
+  docker compose -f docker-compose.dev.yml up -d postgres redis
+fi
 
 echo -e "${CYAN}▶ Waiting for Postgres on localhost:${DB_PORT}…${NC}"
 for i in $(seq 1 40); do
@@ -70,6 +93,8 @@ for i in $(seq 1 40); do
   sleep 1
   if [[ $i -eq 40 ]]; then
     echo -e "${RED}Postgres did not become ready in time.${NC}"
+    echo "Try: docker start interviai-postgres-dev"
+    echo "Or recreate: docker rm -f interviai-postgres-dev interviai-redis-dev && ./scripts/run-local.sh"
     exit 1
   fi
 done
