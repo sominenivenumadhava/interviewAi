@@ -8,6 +8,7 @@ import com.interviai.backend.common.util.ValidationUtil;
 import com.interviai.backend.module.notification.service.EmailService;
 import com.interviai.backend.module.user.dto.request.ChangePasswordRequest;
 import com.interviai.backend.module.user.dto.request.RegisterRequest;
+import com.interviai.backend.module.user.dto.request.UpdatePreferencesRequest;
 import com.interviai.backend.module.user.dto.request.UpdateProfileRequest;
 import com.interviai.backend.module.user.dto.response.UserResponse;
 import com.interviai.backend.module.user.entity.User;
@@ -216,6 +217,27 @@ public class UserServiceImpl implements UserService {
         User savedUser = userRepository.save(user);
         log.info("Profile updated successfully for user: {}", userId);
         
+        return userMapper.toResponse(savedUser);
+    }
+
+    @Override
+    @Transactional
+    public UserResponse updatePreferences(UUID userId, UpdatePreferencesRequest request) {
+        log.info("Updating preferences for user: {}", userId);
+
+        User user = getUserById(userId);
+
+        if (request.getMarketingEmailsEnabled() != null) {
+            user.setMarketingEmailsEnabled(request.getMarketingEmailsEnabled());
+        }
+
+        if (request.getNotificationEmailsEnabled() != null) {
+            user.setNotificationEmailsEnabled(request.getNotificationEmailsEnabled());
+        }
+
+        User savedUser = userRepository.save(user);
+        log.info("Preferences updated successfully for user: {}", userId);
+
         return userMapper.toResponse(savedUser);
     }
 

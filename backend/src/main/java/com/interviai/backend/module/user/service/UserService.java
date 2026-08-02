@@ -3,6 +3,7 @@ package com.interviai.backend.module.user.service;
 import com.interviai.backend.common.dto.PageResponse;
 import com.interviai.backend.module.user.dto.request.ChangePasswordRequest;
 import com.interviai.backend.module.user.dto.request.RegisterRequest;
+import com.interviai.backend.module.user.dto.request.UpdatePreferencesRequest;
 import com.interviai.backend.module.user.dto.request.UpdateProfileRequest;
 import com.interviai.backend.module.user.dto.response.UserResponse;
 import com.interviai.backend.module.user.entity.User;
@@ -59,6 +60,11 @@ public interface UserService {
      * Update user profile.
      */
     UserResponse updateProfile(UUID userId, UpdateProfileRequest request);
+
+    /**
+     * Update user email preferences.
+     */
+    UserResponse updatePreferences(UUID userId, UpdatePreferencesRequest request);
 
     /**
      * Change user password.

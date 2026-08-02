@@ -256,6 +256,7 @@ public class AuthenticationController {
                 .emailVerified(user.getEmailVerified())
                 .isActive(user.getIsActive())
                 .profileCompleteness(user.getProfileCompleteness())
+                .role(user.getRole() != null ? user.getRole().name() : "USER")
                 .build();
         
         return ResponseEntity.ok(ApiResponse.success(userInfo, "User information retrieved"));

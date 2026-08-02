@@ -158,6 +158,39 @@ public class UserController {
     }
 
     @Operation(
+        summary = "Update user preferences",
+        description = "Update the authenticated user's email notification preferences",
+        security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Preferences updated successfully",
+            content = @Content(schema = @Schema(implementation = UserResponse.class))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "User not authenticated"
+        )
+    })
+    @PutMapping("/preferences")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<UserResponse>> updatePreferences(
+            @RequestBody UpdatePreferencesRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        User user = (User) userDetails;
+        log.info("Preferences update request for user: {}", user.getId());
+
+        UserResponse userResponse = userService.updatePreferences(user.getId(), request);
+
+        return ResponseEntity.ok(ApiResponse.success(
+            userResponse,
+            "Preferences updated successfully"
+        ));
+    }
+
+    @Operation(
         summary = "Change user password",
         description = "Change the authenticated user's password",
         security = @SecurityRequirement(name = "bearerAuth")

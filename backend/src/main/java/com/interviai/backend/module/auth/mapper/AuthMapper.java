@@ -28,7 +28,7 @@ public interface AuthMapper {
     AuthenticationResponse.UserInfo toUserInfo(UUID id, String email, String firstName, 
                                              String lastName, Boolean emailVerified, 
                                              Boolean isActive, LocalDateTime lastLoginAt,
-                                             Integer profileCompleteness);
+                                             Integer profileCompleteness, String role);
 
     /**
      * Create session info from session data.

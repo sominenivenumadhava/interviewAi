@@ -135,6 +135,7 @@ public class SecurityConfig {
                 
                 // Admin endpoints
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/v1/users/admin/**").hasRole("ADMIN")
                 
                 // User endpoints - require authentication
                 .requestMatchers("/api/v1/users/**").authenticated()

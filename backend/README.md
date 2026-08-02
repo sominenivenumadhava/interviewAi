@@ -144,7 +144,7 @@ spring:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    secret: ${JWT_SECRET:}  # required in prod; set local default only under spring.profiles=dev
     issuer: interviai-backend
   
 openrouter:
@@ -171,15 +171,15 @@ mvn spring-boot:run
 mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-The backend will be available at `http://localhost:8080`
+The backend will be available at `http://localhost:8082`
 
 ## API Documentation
 
 Once the application is running, access:
 
-- **Swagger UI**: `http://localhost:8080/swagger-ui/index.html`
-- **OpenAPI JSON**: `http://localhost:8080/v3/api-docs`
-- **Health Check**: `http://localhost:8080/actuator/health`
+- **Swagger UI**: `http://localhost:8082/swagger-ui/index.html`
+- **OpenAPI JSON**: `http://localhost:8082/v3/api-docs`
+- **Health Check**: `http://localhost:8082/actuator/health`
 
 ## Available Maven Commands
 
@@ -507,7 +507,7 @@ FROM openjdk:21-jre-slim
 WORKDIR /app
 COPY target/backend-1.0.0.jar app.jar
 
-EXPOSE 8080
+EXPOSE 8082
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
@@ -532,7 +532,7 @@ LOG_LEVEL=INFO
 ```yaml
 # docker-compose.yml health check
 healthcheck:
-  test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+  test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
   interval: 30s
   timeout: 10s
   retries: 3
@@ -574,12 +574,12 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
 ```bash
 # Login to get token
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST http://localhost:8082/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"password123"}'
 
 # Use token for authenticated requests
-curl -X GET http://localhost:8080/api/v1/auth/me \
+curl -X GET http://localhost:8082/api/v1/auth/me \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 

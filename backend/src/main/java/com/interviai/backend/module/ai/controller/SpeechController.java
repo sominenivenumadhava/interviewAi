@@ -46,17 +46,33 @@ public class SpeechController {
         private String key;
         private String url;
         private Long expiresAt;
+        private boolean available;
+        private String provider;
+        private String message;
     }
 
     @GetMapping("/token")
     @Operation(summary = "Get secure token configuration for Deepgram WebSocket Streaming")
     public ResponseEntity<ApiResponse<DeepgramTokenResponse>> getSpeechToken() {
+        // Never return the master Deepgram API key to the client.
+        // Until temporary-token minting exists, always fall back to browser speech.
+        boolean mockOrBlank = deepgramApiKey == null
+                || deepgramApiKey.isBlank()
+                || deepgramApiKey.startsWith("mock-");
+
+        String message = mockOrBlank
+                ? "Browser speech will be used. Deepgram API key is not configured."
+                : "Browser speech will be used. Deepgram temporary-token minting is not yet available.";
+
         DeepgramTokenResponse token = DeepgramTokenResponse.builder()
-                .key(deepgramApiKey)
-                .url("wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&interim_results=true&punctuate=true&encoding=linear16&sample_rate=16000")
-                .expiresAt(System.currentTimeMillis() + (30 * 60 * 1000))
+                .key(null)
+                .url(null)
+                .expiresAt(null)
+                .available(false)
+                .provider("browser")
+                .message(message)
                 .build();
-        return ResponseEntity.ok(ApiResponse.success(token, "Speech credentials generated"));
+        return ResponseEntity.ok(ApiResponse.success(token, "Browser speech fallback configured"));
     }
 
     @PostMapping("/validate")
@@ -146,18 +162,19 @@ public class SpeechController {
     private AnswerValidationRequest.Response buildFallbackValidation(AnswerValidationRequest.Request req) {
         String transcript = req != null && req.getTranscript() != null ? req.getTranscript().toLowerCase() : "";
         boolean relevant = transcript.length() > 10;
-        double score = relevant ? 8.5 : 1.0;
+        double score = relevant ? 5.0 : 1.0;
 
         return AnswerValidationRequest.Response.builder()
                 .isRelevant(relevant)
                 .score(score)
-                .confidence(relevant ? 95 : 99)
-                .feedback(relevant 
-                    ? "Good explanation with relevant architecture details. Remember to mention measurable impact and scalability decisions."
-                    : "The response does not address the interview question asked.")
+                .confidence(40)
+                .feedback("[Fallback] AI scoring unavailable. "
+                        + (relevant
+                            ? "A provisional mid-range score was assigned based on transcript length only; re-run when AI scoring is available."
+                            : "The response appears too short or empty to evaluate; re-run when AI scoring is available."))
                 .missingPoints(List.of("Technical challenges", "Performance optimization", "Measurable business impact"))
-                .strengths(List.of("Clear technical terminology"))
-                .weaknesses(List.of("Omitted performance metrics"))
+                .strengths(List.of())
+                .weaknesses(List.of("AI scoring unavailable — results are provisional"))
                 .idealAnswer("A strong answer highlights architectural decisions, tradeoffs, and production metrics.")
                 .build();
     }

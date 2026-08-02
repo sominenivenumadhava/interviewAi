@@ -98,6 +98,9 @@ public class AuthenticationResponse {
 
         @Schema(description = "Profile completion percentage", example = "85")
         private Integer profileCompleteness;
+
+        @Schema(description = "User role", example = "USER", allowableValues = {"USER", "ADMIN", "MODERATOR"})
+        private String role;
     }
 
     /**

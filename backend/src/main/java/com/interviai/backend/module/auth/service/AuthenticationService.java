@@ -327,7 +327,8 @@ public class AuthenticationService {
             user.getEmailVerified(),
             user.getIsActive(),
             user.getLastLoginAt(),
-            user.getProfileCompleteness()
+            user.getProfileCompleteness(),
+            user.getRole() != null ? user.getRole().name() : "USER"
         );
     }
 }
