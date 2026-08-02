@@ -36,6 +36,40 @@ interface LiveQuestion {
 
 const MAX_ANSWER_LENGTH = 50_000;
 
+// ─── Session-storage persistence ──────────────────────────────────────────────
+const ROOM_STORAGE_KEY = 'interviai_room_state';
+
+interface PersistedRoomState {
+  sessionId: string;
+  currentQIndex: number;
+  currentQuestion: LiveQuestion;
+  timeLeft: number;
+  answer: string;
+  scoreHistory: number[];
+  currentDifficulty: string;
+}
+
+function saveRoomState(state: PersistedRoomState) {
+  try {
+    sessionStorage.setItem(ROOM_STORAGE_KEY, JSON.stringify(state));
+  } catch (_) {}
+}
+
+function loadRoomState(): PersistedRoomState | null {
+  try {
+    const raw = sessionStorage.getItem(ROOM_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as PersistedRoomState) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function clearRoomState() {
+  try {
+    sessionStorage.removeItem(ROOM_STORAGE_KEY);
+  } catch (_) {}
+}
+
 export function Room() {
   const navigate = useNavigate();
   const auth = useRequireAuth();
@@ -58,6 +92,9 @@ export function Room() {
   const [currentQuestion, setCurrentQuestion] = useState<LiveQuestion | null>(null);
   const [displayedText, setDisplayedText] = useState('');
   const [answer, setAnswer] = useState('');
+
+  // Ref to detect whether state was restored (skip re-init on remount)
+  const restoredFromStorage = useRef(false);
 
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -119,11 +156,20 @@ export function Room() {
   const [showHints, setShowHints] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const [timeLeft, setTimeLeft] = useState(parseInt(selectedConfig.duration || '45') * 60);
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const saved = loadRoomState();
+    return saved ? saved.timeLeft : parseInt(selectedConfig.duration || '45') * 60;
+  });
 
   const [validationResult, setValidationResult] = useState<AnswerValidationData | null>(null);
-  const [scoreHistory, setScoreHistory] = useState<number[]>([]);
-  const [currentDifficulty, setCurrentDifficulty] = useState<string>(selectedConfig.difficulty);
+  const [scoreHistory, setScoreHistory] = useState<number[]>(() => {
+    const saved = loadRoomState();
+    return saved ? saved.scoreHistory : [];
+  });
+  const [currentDifficulty, setCurrentDifficulty] = useState<string>(() => {
+    const saved = loadRoomState();
+    return saved ? saved.currentDifficulty : selectedConfig.difficulty;
+  });
   const submitInFlightRef = useRef(false);
 
   // Deepgram Live Speech-to-Text Integration
@@ -200,12 +246,59 @@ export function Room() {
     }
   };
 
-  // Initialize Interview Session with Backend
+  // ── Persist key room state to sessionStorage on every relevant change ────────
+  useEffect(() => {
+    if (!sessionId || !currentQuestion) return;
+    saveRoomState({
+      sessionId,
+      currentQIndex,
+      currentQuestion,
+      timeLeft,
+      answer,
+      scoreHistory,
+      currentDifficulty
+    });
+  }, [sessionId, currentQIndex, currentQuestion, timeLeft, answer, scoreHistory, currentDifficulty]);
+
+  // Initialize Interview Session with Backend (or restore from sessionStorage)
   useEffect(() => {
     if (auth.isLoading || !auth.isAuthenticated) {
       return;
     }
 
+    // ── Restore path: user navigated away and came back ──────────────────────
+    const saved = loadRoomState();
+    if (saved && saved.sessionId && saved.currentQuestion) {
+      restoredFromStorage.current = true;
+      setSessionId(saved.sessionId);
+      setCurrentQIndex(saved.currentQIndex);
+      setCurrentQuestion(saved.currentQuestion);
+      setAnswer(saved.answer || '');
+      // timeLeft, scoreHistory, currentDifficulty already restored in useState initialisers
+      startSessionState({
+        sessionId: saved.sessionId,
+        company: selectedCompany,
+        role: selectedRole,
+        interviewType: selectedConfig.interviewType,
+        difficulty: saved.currentDifficulty,
+        durationMinutes: parseInt(selectedConfig.duration || '45'),
+        totalQuestions: selectedConfig.numberOfQuestions || 5,
+        currentQuestionNumber: saved.currentQIndex,
+        currentScore: saved.scoreHistory.length
+          ? Math.round(saved.scoreHistory.reduce((a, b) => a + b, 0) / saved.scoreHistory.length)
+          : 0,
+        currentDifficulty: saved.currentDifficulty,
+        timeRemainingSeconds: saved.timeLeft,
+        startedAt: new Date().toISOString(),
+        status: 'in_progress',
+        weakSkillsDetected: [],
+        lastEvaluation: null
+      });
+      setLoading(false);
+      return;
+    }
+
+    // ── Fresh start path ─────────────────────────────────────────────────────
     const initSession = async () => {
       setLoading(true);
       setSessionInitError(null);
@@ -327,6 +420,8 @@ export function Room() {
 
   /** EVALUATE_ALL then COMPLETE — used by finish paths */
   const completeInterview = async () => {
+    // Clear persisted state so a new interview starts fresh next time
+    clearRoomState();
     if (sessionId) {
       try {
         await apiClient.post(API_ENDPOINTS.INTERVIEW.EVALUATE_ALL(sessionId));

@@ -17,6 +17,8 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
   const streamRef = useRef<MediaStream | null>(null);
   const finalTranscriptsRef = useRef<string[]>([]);
   const currentInterimRef = useRef<string>('');
+  // Holds the browser Web Speech API recognition instance so stopRecording() can stop it
+  const speechRecognitionRef = useRef<any>(null);
 
   // Stop recording and close WebSocket
   const stopRecording = useCallback(() => {
@@ -26,6 +28,20 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
       }
     } catch (e) {
       console.warn('Error stopping media recorder:', e);
+    }
+    mediaRecorderRef.current = null;
+
+    // Stop browser Web Speech API if it is active (fallback path)
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.onresult = null;
+        speechRecognitionRef.current.onerror = null;
+        speechRecognitionRef.current.onend = null;
+        speechRecognitionRef.current.abort();
+      } catch (e) {
+        console.warn('Error stopping speech recognition:', e);
+      }
+      speechRecognitionRef.current = null;
     }
 
     if (streamRef.current) {
@@ -209,12 +225,18 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
       recognition.interimResults = true;
       recognition.lang = 'en-US';
 
+      // Store in ref so stopRecording() can call abort() on it
+      speechRecognitionRef.current = recognition;
+
       recognition.onstart = () => {
         setIsConnecting(false);
         setIsRecording(true);
       };
 
       recognition.onresult = (event: any) => {
+        // Guard: ignore results that arrive after stopRecording() has been called
+        if (!speechRecognitionRef.current) return;
+
         let interim = '';
         let final = '';
 
@@ -238,6 +260,20 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
 
       recognition.onerror = (e: any) => {
         console.warn('WebSpeech error:', e);
+      };
+
+      // When the browser stops recognition on its own (e.g. silence timeout),
+      // sync the isRecording state so the UI reflects reality.
+      recognition.onend = () => {
+        if (speechRecognitionRef.current) {
+          // Recognition ended unexpectedly (not via stopRecording)
+          speechRecognitionRef.current = null;
+          setIsRecording(false);
+          const fullText = [...finalTranscriptsRef.current, currentInterimRef.current].filter(Boolean).join(' ').trim();
+          if (options.onTranscriptUpdate) {
+            options.onTranscriptUpdate(fullText, true);
+          }
+        }
       };
 
       recognition.start();

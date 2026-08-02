@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, ChevronRight, Calendar, Clock, Loader2, AlertTriangle } from 'lucide-react';
+import { Search, ChevronRight, Calendar, Clock, Loader2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import apiClient, { API_ENDPOINTS } from '../lib/apiClient';
+import { useAuth } from '../contexts/AuthContext';
 
 interface InterviewHistoryItem {
   id: string;
@@ -76,13 +77,19 @@ function formatDate(dateStr: string | null): string {
 
 // ─── History ──────────────────────────────────────────────────────────────────
 export function History() {
+  const { isLoading: authLoading, isAuthenticated } = useAuth();
   const [search, setSearch] = useState('');
   const [interviews, setInterviews] = useState<InterviewHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const retryRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { return () => { if (retryRef.current) clearTimeout(retryRef.current); }; }, []);
 
   useEffect(() => {
-    const fetchHistory = async () => {
+    if (authLoading || !isAuthenticated) return;
+
+    const fetchHistory = async (isRetry = false) => {
       setLoading(true);
       setError(null);
       try {
@@ -115,14 +122,18 @@ export function History() {
         );
       } catch (err: any) {
         console.error('Failed to fetch interview history:', err);
-        setError('Could not load your interview history. Please try again.');
+        if (!isRetry) {
+          retryRef.current = setTimeout(() => fetchHistory(true), 2000);
+        } else {
+          setError('Could not load your interview history. Please try again.');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchHistory();
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   const filteredHistory = interviews.filter(
     (h) =>
@@ -138,22 +149,14 @@ export function History() {
       />
 
       <Card>
-        {/* Search + Filter bar */}
+        {/* Search bar */}
         <div className="border-b border-ink-100 dark:border-white/[0.06] px-5 py-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="flex-1">
-              <Input
-                placeholder="Search by company or role…"
-                icon={<Search size={15} />}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <Button variant="outline" size="sm" className="gap-2 shrink-0">
-              <Filter size={14} />
-              Filter
-            </Button>
-          </div>
+          <Input
+            placeholder="Search by company or role…"
+            icon={<Search size={15} />}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
 
         <CardContent className="p-0">

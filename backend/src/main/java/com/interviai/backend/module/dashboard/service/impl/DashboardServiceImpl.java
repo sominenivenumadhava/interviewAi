@@ -95,7 +95,7 @@ public class DashboardServiceImpl implements DashboardService {
         summary.setFullName(user.getFirstName() + " " + user.getLastName());
         summary.setEmail(user.getEmail());
         summary.setCurrentLevel(determineUserLevel(user));
-        summary.setTotalPracticeHours(calculateTotalPracticeHours(user));
+        summary.setTotalPracticeMinutes(calculateTotalPracticeMinutes(user));
         summary.setMemberSince(user.getCreatedAt()); // already LocalDateTime
         summary.setHasActiveSubscription(user.getIsActive());
         summary.setSubscriptionPlan("Free"); // Would come from subscription service
@@ -430,16 +430,16 @@ public class DashboardServiceImpl implements DashboardService {
         return "Beginner";
     }
     
-    private Integer calculateTotalPracticeHours(User user) {
+    private Long calculateTotalPracticeMinutes(User user) {
         List<Interview> allInterviews = interviewRepository.findByUser(user);
         long totalMinutes = allInterviews.stream()
                 .mapToLong(i -> {
                     if (i.getActualDuration() != null) return i.getActualDuration().toMinutes();
                     if (i.getDurationMinutes() != null) return i.getDurationMinutes();
-                    return 15L;
+                    return 0L;
                 })
                 .sum();
-        return (int) Math.ceil((double) totalMinutes / 60.0);
+        return totalMinutes;
     }
     
     private Integer calculateCurrentStreak(User user) {

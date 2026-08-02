@@ -23,6 +23,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useInterviewSession } from '../contexts/InterviewSessionContext';
+import { useAuth } from '../contexts/AuthContext';
 
 // ─── Chart tooltip ─────────────────────────────────────────────────────────────
 const ChartTooltip = ({ active, payload, label }: any) => {
@@ -58,12 +59,14 @@ function EmptyChart() {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export function Dashboard() {
   const { activeSession } = useInterviewSession();
+  const { isLoading: authLoading, isAuthenticated } = useAuth();
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading]      = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError]          = useState<string | null>(null);
+  const retryTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (isRetry = false) => {
     setError(null);
     try {
       const response = await apiClient.get<any>(API_ENDPOINTS.DASHBOARD.GET);
@@ -74,17 +77,32 @@ export function Dashboard() {
       }
     } catch (err: any) {
       console.warn('Dashboard fetch error:', err);
-      setError('Could not load dashboard data. Please refresh.');
+      if (!isRetry) {
+        // Auto-retry once after 2 seconds (handles brief backend startup lag on refresh)
+        retryTimeoutRef.current = setTimeout(() => fetchDashboardData(true), 2000);
+      } else {
+        setError('Could not load dashboard data. Please refresh.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Fetch on mount and whenever a session moves to 'completed'
+  // Cancel any pending retry on unmount
   useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+    };
+  }, []);
+
+  // Fetch once auth has finished loading — this handles the page-refresh race condition
+  // where AuthContext.initializeAuth() is async and the token isn't set yet on first render.
+  useEffect(() => {
+    if (authLoading) return;   // wait for token to be restored from localStorage
+    if (!isAuthenticated) return; // not logged in — don't fetch
     fetchDashboardData();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated]); // re-run when auth resolves
 
   // If a session just finished (completed), refresh dashboard stats
   useEffect(() => {
@@ -113,13 +131,25 @@ export function Dashboard() {
   // ── Stats: use real API values, fall back to 0 (not fake numbers) ──────────
   const totalSessions  = dashboardData?.interviewStats?.totalInterviews   ?? 0;
   const avgScore       = dashboardData?.performanceOverview?.averageScore  ?? 0;
-  const practiceHours  = dashboardData?.userSummary?.totalPracticeHours   ?? 0;
+  const totalPracticeMinutes = dashboardData?.userSummary?.totalPracticeMinutes ?? 0;
   const bestScore      = dashboardData?.performanceOverview?.bestScore     ?? 0;
   const completedMonth = dashboardData?.interviewStats?.completedThisMonth ?? 0;
   const improvement    = dashboardData?.performanceOverview?.improvement   ?? 0;
   const userLevel      = dashboardData?.userSummary?.currentLevel         ?? 'Beginner';
   const bestRole       = dashboardData?.performanceOverview?.bestScoreRole ?? '';
   const trend          = dashboardData?.performanceOverview?.trend         ?? 'NO_DATA';
+
+  /** Convert total minutes → "Xh Ym Zs" display string */
+  const formatPracticeTime = (totalMins: number): string => {
+    if (totalMins <= 0) return '—';
+    const h = Math.floor(totalMins / 60);
+    const m = Math.floor(totalMins % 60);
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h}h`;
+    return `${m}m`;
+  };
+
+  const practiceTimeDisplay = formatPracticeTime(totalPracticeMinutes);
 
   const improvementText = trend === 'UP'
     ? `+${improvement?.toFixed(1)}% from last session`
@@ -289,9 +319,9 @@ export function Dashboard() {
         />
         <MotionCard
           title="Practice Hours"
-          value={practiceHours > 0 ? practiceHours : '—'}
-          suffix={practiceHours > 0 ? ' hrs' : ''}
-          description={practiceHours === 0 ? 'No practice recorded yet' : userLevel + ' Tier'}
+          value={practiceTimeDisplay}
+          suffix={''}
+          description={totalPracticeMinutes === 0 ? 'No practice recorded yet' : userLevel + ' Tier'}
           icon={<Clock size={20} />}
           iconColor="bg-amber-500/10"
           iconTextColor="text-amber-500"

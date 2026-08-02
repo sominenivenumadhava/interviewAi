@@ -22,7 +22,7 @@ public class DashboardResponse {
         private String fullName;
         private String email;
         private String currentLevel;
-        private Integer totalPracticeHours;
+        private Long totalPracticeMinutes;
         private LocalDateTime memberSince;
         private Boolean hasActiveSubscription;
         private String subscriptionPlan;
