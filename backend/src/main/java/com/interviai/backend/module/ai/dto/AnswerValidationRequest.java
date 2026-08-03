@@ -30,6 +30,7 @@ public class AnswerValidationRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Response {
+        @com.fasterxml.jackson.annotation.JsonProperty("isRelevant")
         private boolean isRelevant;
         private Double score; // out of 10
         private Integer confidence; // percentage e.g. 95

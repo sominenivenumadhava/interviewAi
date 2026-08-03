@@ -2,6 +2,7 @@ package com.interviai.backend.module.interview.generation.impl;
 
 import com.interviai.backend.module.interview.enums.InterviewType;
 import com.interviai.backend.module.interview.generation.AbstractQuestionGenerator;
+import com.interviai.backend.module.interview.generation.FallbackQuestionBank;
 import com.interviai.backend.module.interview.generation.GeneratedQuestionDraft;
 import com.interviai.backend.module.interview.generation.QuestionGenerationContext;
 import org.springframework.stereotype.Component;
@@ -29,14 +30,17 @@ public class ManagerialQuestionGenerator extends AbstractQuestionGenerator {
     @Override
     public String buildSystemPrompt(QuestionGenerationContext ctx) {
         return """
-            You are a Bar Raiser / hiring manager interviewer at %s for a %s candidate.
+            You are a Bar Raiser / hiring manager interviewer at %s for a %s candidate (%s).
+            Session ID: %s — invent new leadership scenarios; never repeat the same story prompt.
             
             STRICT RULES — MANAGERIAL / BAR RAISER ROUND ONLY:
-            - Generate ONLY scenario-based leadership questions: decision making, ownership, stakeholder management,
-              conflict resolution, project failures, architecture decisions (as leadership choices — not DSA),
-              mentoring juniors, prioritization, customer focus.
+            - Generate ONLY scenario-based leadership questions. Randomize across:
+              ownership, leadership, prioritization, conflict resolution, stakeholder management,
+              customer obsession, architecture decisions, project failure, mentoring, decision making.
             - FORBIDDEN: DSA coding problems, LeetCode, pure technical trivia drills, basic HR screening only.
             - Every question category MUST be exactly "Managerial".
+            - Generate completely new questions different from previously generated ones.
+              Avoid semantic duplication and repeated wording. Change scenarios every time.
             
             Return raw JSON only:
             {
@@ -51,13 +55,20 @@ public class ManagerialQuestionGenerator extends AbstractQuestionGenerator {
                 }
               ]
             }
-            """.formatted(ctx.safeCompany(), ctx.safeRole(), ctx.safeDifficulty());
+            """.formatted(
+                ctx.safeCompany(),
+                ctx.safeRole(),
+                ctx.safeExperience(),
+                ctx.safeSessionId(),
+                ctx.safeDifficulty()
+        );
     }
 
     @Override
     public String buildUserPrompt(QuestionGenerationContext ctx) {
         return """
             Generate exactly %d distinct MANAGERIAL / Bar Raiser scenario questions.
+            Never reuse identical scenarios from the avoid-list.
             
             %s
             """.formatted(ctx.getQuestionCount(), commonContextBlock(ctx));
@@ -65,24 +76,6 @@ public class ManagerialQuestionGenerator extends AbstractQuestionGenerator {
 
     @Override
     public List<GeneratedQuestionDraft> fallbackQuestions(QuestionGenerationContext ctx) {
-        String role = ctx.safeRole();
-        return List.of(
-                baseDraft("Describe a high-stakes decision you made as a " + role + " with incomplete information. How did you decide and what was the outcome?",
-                        ctx, List.of("What signals told you it was time to commit?")),
-                baseDraft("Tell me about a time you took ownership of a failing project. What changed under your leadership?",
-                        ctx, List.of("How did you reset stakeholder expectations?")),
-                baseDraft("Describe a conflict between engineering priorities and business deadlines. How did you resolve it?",
-                        ctx, List.of("What trade-off did you explicitly accept?")),
-                baseDraft("Share an example of mentoring a junior engineer who was struggling. What was your approach?",
-                        ctx, List.of("How did you measure improvement?")),
-                baseDraft("Tell me about a project failure. What was your role, what did you learn, and what process changed afterward?",
-                        ctx, List.of("How did you communicate the failure to leadership?")),
-                baseDraft("How do you prioritize a backlog when everything is marked P0 by different stakeholders?",
-                        ctx, List.of("Give a concrete example with conflicting customers.")),
-                baseDraft("Describe an architecture or technology decision you influenced. How did you evaluate trade-offs and get buy-in?",
-                        ctx, List.of("What would you revisit with today's information?")),
-                baseDraft("Tell me about a time you put the customer first even when it was inconvenient for the team.",
-                        ctx, List.of("How did you balance quality with speed?"))
-        );
+        return FallbackQuestionBank.managerial(ctx);
     }
 }

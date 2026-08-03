@@ -14,28 +14,63 @@ import java.util.Map;
 public abstract class AbstractQuestionGenerator implements QuestionGenerationStrategy {
 
     protected String commonContextBlock(QuestionGenerationContext ctx) {
+        String askedBlock;
+        if (ctx.getAskedQuestions() == null || ctx.getAskedQuestions().isEmpty()) {
+            askedBlock = "(none yet — still invent fresh, non-cliché questions)";
+        } else {
+            askedBlock = ctx.getAskedQuestions().stream()
+                    .limit(25)
+                    .map(q -> "- " + q)
+                    .reduce((a, b) -> a + "\n" + b)
+                    .orElse("(none)");
+        }
+        String topics = ctx.getAskedTopics() == null || ctx.getAskedTopics().isEmpty()
+                ? "(none)"
+                : String.join(", ", ctx.getAskedTopics().stream().limit(30).toList());
+
         return """
+            Interview Session ID: %s
+            Session Seed: %d
+            Diversity Nonce: %s
             Selected Round: %s
             Job Role: %s
             Company: %s
-            Experience / Difficulty Level: %s
+            Candidate Experience Level: %s
+            Difficulty: %s
             Candidate Skills: %s
             Focus Areas: %s
             Preferred Language: %s
             Job Description: %s
             Resume Summary: %s
             Custom Instructions: %s
+            Company Interview Flavor: %s
+            Topics / Concepts Already Used (avoid overusing): %s
+            Previously Asked Questions (DO NOT repeat or paraphrase closely):
+            %s
+            
+            UNIQUENESS MANDATE:
+            Generate completely new questions that are different from previously generated questions.
+            Avoid semantic duplication and repeated wording.
+            Randomize topics, scenarios, examples, numbers, variable names, and follow-ups.
+            Even for the same concept, produce a distinctly different version.
             """.formatted(
+                ctx.safeSessionId(),
+                ctx.getSessionSeed(),
+                ctx.safeDiversityNonce(),
                 ctx.effectiveType().name(),
                 ctx.safeRole(),
                 ctx.safeCompany(),
+                ctx.safeExperience(),
                 ctx.safeDifficulty(),
                 ctx.safeSkills(),
                 blank(ctx.getFocusAreas(), "As appropriate for this round"),
                 blank(ctx.getPreferredLanguage(), "Not specified"),
                 blank(ctx.getJobDescription(), "Not provided"),
                 blank(ctx.getResumeContent(), "Not provided"),
-                blank(ctx.getCustomInstructions(), "None")
+                blank(ctx.getCustomInstructions(), "None"),
+                CompanyInterviewFlavor.flavorFor(ctx.safeCompany(), ctx.getSessionSeed()),
+                topics,
+                askedBlock
         );
     }
 

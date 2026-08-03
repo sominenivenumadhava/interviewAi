@@ -14,7 +14,7 @@ import com.interviai.backend.module.interview.enums.InterviewStatus;
 import com.interviai.backend.module.interview.enums.InterviewType;
 import com.interviai.backend.module.interview.generation.GeneratedQuestionDraft;
 import com.interviai.backend.module.interview.generation.QuestionGenerationContext;
-import com.interviai.backend.module.interview.generation.RoundAwareQuestionGenerator;
+import com.interviai.backend.module.interview.generation.QuestionGenerationService;
 import com.interviai.backend.module.interview.mapper.InterviewMapper;
 import com.interviai.backend.module.interview.repository.InterviewAnswerRepository;
 import com.interviai.backend.module.interview.repository.InterviewQuestionRepository;
@@ -65,7 +65,7 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private RoundAwareQuestionGenerator roundAwareQuestionGenerator;
+    private QuestionGenerationService questionGenerationService;
     
     @Override
     public List<InterviewQuestionResponse> generateQuestions(String sessionId, UUID userId) {
@@ -98,6 +98,17 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
                 preferredLanguage = focus.toString();
             }
 
+            String experienceLevel = null;
+            if (config.get("experienceLevel") != null) {
+                experienceLevel = config.get("experienceLevel").toString();
+            } else if (interview.getDifficultyLevel() != null) {
+                experienceLevel = switch (interview.getDifficultyLevel()) {
+                    case EASY -> "Junior";
+                    case HARD -> "Senior";
+                    default -> "Mid-level";
+                };
+            }
+
             InterviewType roundType = interview.getInterviewType() != null
                     ? interview.getInterviewType()
                     : InterviewType.TECHNICAL;
@@ -115,9 +126,11 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
                     .resumeContent(resumeContent)
                     .candidateSkills(skills)
                     .preferredLanguage(preferredLanguage)
+                    .experienceLevel(experienceLevel)
+                    .sessionId(sessionId)
                     .build();
 
-            List<GeneratedQuestionDraft> drafts = roundAwareQuestionGenerator.generate(ctx);
+            List<GeneratedQuestionDraft> drafts = questionGenerationService.generateForInterview(interview, ctx);
             List<InterviewQuestion> questions = new ArrayList<>();
             for (int i = 0; i < drafts.size(); i++) {
                 questions.add(toEntity(interview, drafts.get(i), i + 1));

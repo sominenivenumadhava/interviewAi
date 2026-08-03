@@ -54,6 +54,35 @@ public class SpeechController {
     @Value("${deepgram.api.listen-url:wss://api.deepgram.com/v1/listen?model=nova-2&encoding=linear16&sample_rate=16000&channels=1&punctuate=true&interim_results=true&smart_format=true&endpointing=300}")
     private String deepgramListenUrl;
 
+    @jakarta.annotation.PostConstruct
+    void resolveDeepgramKey() {
+        if (deepgramApiKey == null || deepgramApiKey.isBlank()) {
+            deepgramApiKey = firstNonBlank(
+                    System.getenv("DEEPGRAM_API_KEY"),
+                    System.getProperty("DEEPGRAM_API_KEY"),
+                    System.getProperty("deepgram.api.key")
+            );
+        }
+        boolean ready = deepgramApiKey != null
+                && !deepgramApiKey.isBlank()
+                && !deepgramApiKey.startsWith("mock-")
+                && !deepgramApiKey.startsWith("your-");
+        log.info("Deepgram STT configured: {} (key length={})",
+                ready, ready ? deepgramApiKey.trim().length() : 0);
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String v : values) {
+            if (v != null && !v.isBlank()) {
+                return v.trim();
+            }
+        }
+        return null;
+    }
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -200,7 +229,7 @@ public class SpeechController {
 
         try {
             AnswerValidationRequest.Response response = aiService.generateContent(prompt)
-                    .map(this::parseValidationResponse)
+                    .map(json -> parseValidationResponse(json, request))
                     .block(Duration.ofSeconds(12));
 
             if (response != null) {
@@ -273,36 +302,219 @@ public class SpeechController {
         );
     }
 
-    private AnswerValidationRequest.Response parseValidationResponse(String json) {
+    private AnswerValidationRequest.Response parseValidationResponse(
+            String json,
+            AnswerValidationRequest.Request request) {
         try {
             String clean = json.trim();
             if (clean.startsWith("```json")) clean = clean.substring(7);
             if (clean.startsWith("```")) clean = clean.substring(3);
             if (clean.endsWith("```")) clean = clean.substring(0, clean.length() - 3);
-            return objectMapper.readValue(clean.trim(), AnswerValidationRequest.Response.class);
+            AnswerValidationRequest.Response parsed =
+                    objectMapper.readValue(clean.trim(), AnswerValidationRequest.Response.class);
+            if (parsed != null) {
+                return parsed;
+            }
         } catch (Exception e) {
-            log.warn("Failed to parse LLM validation JSON, using fallback: {}", json, e);
-            return buildFallbackValidation(null);
+            log.warn("Failed to parse LLM validation JSON, using fallback: {}", truncate(json, 200));
         }
+        return buildFallbackValidation(request);
     }
 
     private AnswerValidationRequest.Response buildFallbackValidation(AnswerValidationRequest.Request req) {
-        String transcript = req != null && req.getTranscript() != null ? req.getTranscript().toLowerCase() : "";
+        if (req == null) {
+            return AnswerValidationRequest.Response.builder()
+                    .isRelevant(false)
+                    .score(1.0)
+                    .confidence(30)
+                    .feedback("[Fallback] AI scoring unavailable and no answer context was provided.")
+                    .missingPoints(List.of())
+                    .strengths(List.of())
+                    .weaknesses(List.of("AI scoring unavailable — results are provisional"))
+                    .idealAnswer("")
+                    .build();
+        }
+
+        String round = req.getInterviewType() != null ? req.getInterviewType().trim().toUpperCase() : "";
+        String question = req.getQuestion() != null ? req.getQuestion() : "";
+        String transcript = req.getTranscript() != null ? req.getTranscript().trim() : "";
+
+        if (transcript.isBlank()) {
+            return AnswerValidationRequest.Response.builder()
+                    .isRelevant(false)
+                    .score(1.0)
+                    .confidence(90)
+                    .feedback("No answer was captured. Speak or type a response before submitting.")
+                    .missingPoints(List.of("Provide a complete answer to the question"))
+                    .strengths(List.of())
+                    .weaknesses(List.of("Empty response"))
+                    .idealAnswer("")
+                    .build();
+        }
+
+        if (isAptitudeRound(round) || looksLikeAptitudeQuestion(question)) {
+            return scoreAptitudeHeuristically(question, transcript);
+        }
+
         boolean relevant = transcript.length() > 10;
-        double score = relevant ? 5.0 : 1.0;
+        String criteriaHint = switch (round) {
+            case "CODING", "DSA", "OA" -> "approach, complexity, and edge cases";
+            case "SYSTEM_DESIGN", "SYSTEMDESIGN" -> "architecture, scalability, and trade-offs";
+            case "HR", "BEHAVIORAL" -> "STAR structure, communication, and examples";
+            case "MANAGERIAL", "BAR_RAISER" -> "ownership, decisions, and leadership";
+            default -> "concepts, accuracy, and clarity";
+        };
 
         return AnswerValidationRequest.Response.builder()
                 .isRelevant(relevant)
-                .score(score)
-                .confidence(40)
-                .feedback("[Fallback] AI scoring unavailable. "
-                        + (relevant
-                            ? "A provisional mid-range score was assigned based on transcript length only; re-run when AI scoring is available."
-                            : "The response appears too short or empty to evaluate; re-run when AI scoring is available."))
-                .missingPoints(List.of("Technical challenges", "Performance optimization", "Measurable business impact"))
-                .strengths(List.of())
+                .score(relevant ? 5.5 : 1.0)
+                .confidence(45)
+                .feedback("[Fallback] AI scoring unavailable (OpenRouter key missing or unreachable). "
+                        + "A provisional score was assigned from answer length only. "
+                        + "Set OPENROUTER_API_KEY in .env and restart the backend for real scoring.")
+                .missingPoints(relevant
+                        ? List.of("Add more detail covering " + criteriaHint)
+                        : List.of("Answer the question that was asked"))
+                .strengths(relevant ? List.of("Provided a non-empty response") : List.of())
                 .weaknesses(List.of("AI scoring unavailable — results are provisional"))
-                .idealAnswer("A strong answer highlights architectural decisions, tradeoffs, and production metrics.")
+                .idealAnswer("Re-run validation after configuring OPENROUTER_API_KEY for round-specific feedback.")
                 .build();
+    }
+
+    private static boolean isAptitudeRound(String round) {
+        return "APTITUDE".equals(round) || "ASSESSMENT".equals(round) || "OA".equals(round);
+    }
+
+    private static boolean looksLikeAptitudeQuestion(String question) {
+        String q = question.toLowerCase();
+        return q.contains("km/h") || q.contains("ratio") || q.contains("average")
+                || q.contains("percent") || q.contains("train") || q.contains("ages")
+                || q.contains("speed") || q.contains("probability");
+    }
+
+    /**
+     * Offline aptitude scoring so correct numeric answers are not marked irrelevant
+     * when the LLM is unavailable.
+     */
+    private AnswerValidationRequest.Response scoreAptitudeHeuristically(String question, String transcript) {
+        java.util.regex.Matcher numMatcher = java.util.regex.Pattern
+                .compile("(\\d+(?:\\.\\d+)?)")
+                .matcher(transcript.replace(",", ""));
+        java.util.List<Double> answerNumbers = new java.util.ArrayList<>();
+        while (numMatcher.find()) {
+            try {
+                answerNumbers.add(Double.parseDouble(numMatcher.group(1)));
+            } catch (NumberFormatException ignored) {
+                // skip
+            }
+        }
+
+        if (answerNumbers.isEmpty()) {
+            return AnswerValidationRequest.Response.builder()
+                    .isRelevant(transcript.length() > 8)
+                    .score(3.0)
+                    .confidence(55)
+                    .feedback("[Fallback] AI scoring unavailable. Your answer did not include a clear numeric result. "
+                            + "For aptitude questions, state the final number (and units).")
+                    .missingPoints(List.of("Final numeric answer", "Brief calculation steps"))
+                    .strengths(List.of())
+                    .weaknesses(List.of("No clear numeric conclusion", "AI scoring unavailable"))
+                    .idealAnswer("State the computed value with units, e.g. \"72 km/h\".")
+                    .build();
+        }
+
+        Double expected = tryComputeAptitudeExpected(question);
+        double userValue = answerNumbers.get(answerNumbers.size() - 1); // prefer last number (final answer)
+        boolean matched = false;
+        double score = 6.0;
+        String feedback;
+
+        if (expected != null) {
+            double tol = Math.max(0.5, Math.abs(expected) * 0.05); // 5% or 0.5
+            matched = Math.abs(userValue - expected) <= tol;
+            // Also accept nearby STT errors (e.g. 74 vs 72)
+            boolean near = Math.abs(userValue - expected) <= Math.max(2.0, Math.abs(expected) * 0.08);
+            if (matched) {
+                score = 9.5;
+                feedback = String.format(
+                        "[Fallback] AI scoring unavailable, but your answer (%.2f) matches the expected result (%.2f). "
+                                + "Configure OPENROUTER_API_KEY for richer feedback.",
+                        userValue, expected);
+            } else if (near) {
+                score = 8.0;
+                feedback = String.format(
+                        "[Fallback] AI scoring unavailable. Your answer (%.2f) is close to the expected %.2f "
+                                + "(possible speech/rounding difference). Configure OPENROUTER_API_KEY for full evaluation.",
+                        userValue, expected);
+                matched = true;
+            } else {
+                score = 4.0;
+                feedback = String.format(
+                        "[Fallback] AI scoring unavailable. Expected about %.2f, but heard %.2f. "
+                                + "Re-check the calculation. Set OPENROUTER_API_KEY for detailed AI feedback.",
+                        expected, userValue);
+            }
+        } else {
+            feedback = String.format(
+                    "[Fallback] AI scoring unavailable. Detected numeric answer %.2f and treated it as an aptitude response. "
+                            + "Set OPENROUTER_API_KEY for exact correctness checking.",
+                    userValue);
+            score = 7.0;
+            matched = true;
+        }
+
+        return AnswerValidationRequest.Response.builder()
+                .isRelevant(true)
+                .score(score)
+                .confidence(expected != null ? 70 : 50)
+                .feedback(feedback)
+                .missingPoints(matched
+                        ? List.of()
+                        : List.of("Correct final numeric value", "Show intermediate steps"))
+                .strengths(matched
+                        ? List.of("Provided a numeric answer", "Addressed the aptitude question")
+                        : List.of("Attempted a numeric answer"))
+                .weaknesses(List.of("AI scoring unavailable — heuristic/offline check used"))
+                .idealAnswer(expected != null
+                        ? ("Expected answer ≈ " + expected)
+                        : "Provide the final numeric result with units.")
+                .build();
+    }
+
+    /** Best-effort solver for common aptitude patterns used in practice rounds. */
+    private Double tryComputeAptitudeExpected(String question) {
+        if (question == null || question.isBlank()) {
+            return null;
+        }
+        String q = question.toLowerCase();
+        java.util.regex.Matcher m;
+
+        // Train length L meters passes a pole in T seconds → speed km/h = (L/T) * 18/5
+        m = java.util.regex.Pattern
+                .compile("(?:train|object)?[^\\d]{0,40}?(\\d+(?:\\.\\d+)?)\\s*m(?:eters?)?[^\\d]{0,80}?(\\d+(?:\\.\\d+)?)\\s*seconds?")
+                .matcher(q);
+        if ((q.contains("pole") || q.contains("speed") || q.contains("km")) && m.find()) {
+            double length = Double.parseDouble(m.group(1));
+            double seconds = Double.parseDouble(m.group(2));
+            if (seconds > 0) {
+                return (length / seconds) * (18.0 / 5.0);
+            }
+        }
+
+        // Ratio of ages A:B = r1:r2 and B is D years older → ages
+        m = java.util.regex.Pattern
+                .compile("ratio[^\\d]{0,20}(\\d+)\\s*:\\s*(\\d+)[^\\d]{0,60}(\\d+)\\s*years?\\s*older")
+                .matcher(q);
+        if (q.contains("age") && m.find()) {
+            double r1 = Double.parseDouble(m.group(1));
+            double r2 = Double.parseDouble(m.group(2));
+            double diff = Double.parseDouble(m.group(3));
+            if (r2 != r1) {
+                // B - A = diff, A/B = r1/r2 → A = diff * r1 / (r2 - r1)
+                return diff * r1 / (r2 - r1); // return A's age; caller compares last number loosely
+            }
+        }
+
+        return null;
     }
 }

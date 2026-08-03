@@ -28,6 +28,11 @@ public interface AIService {
      * @return AI generated response
      */
     Mono<String> generateStructuredContent(String prompt, String systemInstruction);
+
+    /**
+     * Generate structured content with high temperature for interview question variety.
+     */
+    Mono<String> generateCreativeStructuredContent(String prompt, String systemInstruction);
     
     /**
      * Evaluate interview answer

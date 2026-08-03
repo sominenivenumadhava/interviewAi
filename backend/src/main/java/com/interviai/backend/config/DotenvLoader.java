@@ -57,10 +57,21 @@ public final class DotenvLoader {
                     continue;
                 }
                 System.setProperty(key, value);
+                // Also set Spring-style aliases so @Value("${deepgram.api.key}") etc. resolve
+                // when only DEEPGRAM_API_KEY is present as a system property.
+                String springAlias = toSpringProperty(key);
+                if (springAlias != null
+                        && (System.getProperty(springAlias) == null
+                            || System.getProperty(springAlias).isBlank())) {
+                    System.setProperty(springAlias, value);
+                }
                 loaded++;
             }
             if (loaded > 0) {
                 System.out.println("[dotenv] Loaded " + loaded + " vars from " + envFile.toAbsolutePath());
+                boolean dg = nonBlankProp("DEEPGRAM_API_KEY") || nonBlankProp("deepgram.api.key");
+                boolean or = nonBlankProp("OPENROUTER_API_KEY") || nonBlankProp("openrouter.api.key");
+                System.out.println("[dotenv] Deepgram key configured: " + dg + " | OpenRouter key configured: " + or);
             }
         } catch (Exception e) {
             System.err.println("[dotenv] Failed to read " + envFile + ": " + e.getMessage());
@@ -80,5 +91,28 @@ public final class DotenvLoader {
             }
         }
         return null;
+    }
+
+    private static boolean nonBlankProp(String key) {
+        String v = System.getProperty(key);
+        if (v == null || v.isBlank()) {
+            v = System.getenv(key);
+        }
+        return v != null && !v.isBlank();
+    }
+
+    /** Map common UPPER_SNAKE env keys to Spring property names. */
+    private static String toSpringProperty(String envKey) {
+        return switch (envKey) {
+            case "DEEPGRAM_API_KEY" -> "deepgram.api.key";
+            case "DEEPGRAM_BASE_URL" -> "deepgram.api.base-url";
+            case "DEEPGRAM_LISTEN_URL" -> "deepgram.api.listen-url";
+            case "OPENROUTER_API_KEY" -> "openrouter.api.key";
+            case "OPENROUTER_BASE_URL" -> "openrouter.api.base-url";
+            case "OPENROUTER_MODEL" -> "openrouter.api.model";
+            case "APIFY_API_TOKEN" -> "apify.api-token";
+            case "JWT_SECRET" -> "app.jwt.secret";
+            default -> null;
+        };
     }
 }

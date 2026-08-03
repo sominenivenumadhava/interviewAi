@@ -108,38 +108,68 @@ function resolveQuestionCategory(category: string | undefined, interviewType: st
   return map[normalized] || category;
 }
 
-function firstQuestionFallback(interviewType: string, role: string, company: string): string {
+function firstQuestionFallback(interviewType: string, role: string, company: string, sessionId?: string): string {
+  const seed = hashSeed(`${sessionId || ''}|${interviewType}|${role}|${company}|${Date.now()}`);
+  const pick = <T,>(arr: T[]) => arr[Math.abs(seed) % arr.length];
+
   switch (interviewType) {
     case 'HR':
     case 'BEHAVIORAL':
-      return `Welcome to the HR round for ${role} at ${company}. Tell me about yourself.`;
+      return pick([
+        `Welcome to the HR round for ${role} at ${company}. Walk me through a recent project that shows your fit for this role.`,
+        `For ${role} at ${company}: tell me about a time you handled conflict on a team.`,
+        `Why ${company} for your next ${role} move — what specifically attracts you?`,
+        `Describe a strength peers praise and a growth area you are actively improving.`
+      ]);
     case 'CODING':
-      return `[EASY] Two Sum (Arrays)
-
-Problem Statement:
-Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.
-
-Constraints:
-2 <= nums.length <= 10^4
-
-Sample Input:
-nums = [2,7,11,15], target = 9
-
-Sample Output:
-[0,1]
-
-Expected Time Complexity: O(n)
-Expected Space Complexity: O(n)`;
+      return pick([
+        `[MEDIUM] Reverse Nodes in K-Group (Linked List)\n\nProblem Statement:\nReverse nodes of a linked list in groups of k. If the final group has fewer than k nodes, leave it as-is.\n\nSample Input:\n1->2->3->4->5, k=2\n\nSample Output:\n2->1->4->3->5`,
+        `[MEDIUM] Group Anagrams (Strings)\n\nProblem Statement:\nGroup an array of strings into anagram clusters.\n\nSample Input:\n[eat,tea,tan,ate,nat,bat]\n\nSample Output:\n[[eat,tea,ate],[tan,nat],[bat]]`,
+        `[EASY] Pair Sum Check (HashMap)\n\nProblem Statement:\nGiven nums and target T, return whether any two distinct indices sum to T.\n\nSample Input:\nnums=[1,4,3,2], T=5\n\nSample Output:\ntrue`,
+        `[MEDIUM] Course Order (Graph)\n\nProblem Statement:\nGiven numCourses and prerequisites, return one valid course order if you can finish all courses.\n\nSample Input:\n2, [[1,0]]\n\nSample Output:\n[0,1]`
+      ]);
     case 'SYSTEM_DESIGN':
-      return `Design a URL Shortener for ${company}. Cover requirements, APIs, data model, caching, and scaling.`;
+      return pick([
+        `Design a notification fan-out system for ${company}. Cover preferences, rate limits, and duplicate prevention.`,
+        `Design a food-delivery matching platform. Discuss ETA, courier assignment, and surge.`,
+        `Design a rate limiter service used by many APIs at ${company}.`,
+        `Design a payment ledger with idempotent charges and refunds for ${company}.`
+      ]);
     case 'MANAGERIAL':
-      return `Describe a high-stakes decision you made as a ${role} with incomplete information. How did you decide and what was the outcome?`;
-    case 'APTITUDE':
-      return `A train 120 m long passes a pole in 6 seconds. What is its speed in km/h? Explain your steps.`;
+      return pick([
+        `Describe a prioritization call you made as a ${role} when two P0s collided.`,
+        `Tell me about owning an incident end-to-end. How did you prevent recurrence?`,
+        `Share a time you mentored someone through a performance dip.`,
+        `Describe pushing back on scope that would have hurt reliability.`
+      ]);
+    case 'APTITUDE': {
+      const len = 80 + (Math.abs(seed) % 80);
+      const secs = 4 + (Math.abs(seed >> 3) % 8);
+      return pick([
+        `A train ${len} m long passes a pole in ${secs} seconds. What is its speed in km/h? Explain your steps.`,
+        `Ages of A and B are in ratio 3:5 and B is 20 years older than A. Find their ages.`,
+        `Two pipes fill a tank in 12 and 15 hours; a drain empties it in 20. If all open, how long to fill?`,
+        `Find the next number: 2, 6, 12, 20, 30, ? Explain the pattern.`
+      ]);
+    }
     case 'TECHNICAL':
     default:
-      return `Explain the core OOP principles and how you apply them in day-to-day ${role} work at a company like ${company}.`;
+      return pick([
+        `Explain caching layers (CDN, app, DB) and a stampede you would prevent in a ${role} service at ${company}.`,
+        `Compare SQL vs NoSQL for a ${role} workload at a company like ${company}. When would each hurt?`,
+        `Walk through authentication vs authorization for a microservice used by a ${role}.`,
+        `Describe how you would diagnose a production latency spike in a ${role} system.`
+      ]);
   }
+}
+
+function hashSeed(input: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h | 0;
 }
 
 function roundInterviewerTitle(interviewType: string): string {
@@ -344,13 +374,19 @@ export function Room() {
       return null;
     } catch (e) {
       console.warn('Realtime validation API error, using fallback:', e);
-      // Fallback validation
+      const round = (selectedConfig.interviewType || '').toUpperCase();
+      const isAptitude = ['APTITUDE', 'ASSESSMENT', 'OA'].includes(round);
+      const hasContent = transcriptText.trim().length > 10;
       const fallbackValidation: AnswerValidationData = {
-        isRelevant: transcriptText.trim().length > 10,
-        score: transcriptText.trim().length > 10 ? 8.5 : 2.0,
-        confidence: 94,
-        feedback: 'Good technical response. Remember to explicitly mention measurable metrics and trade-offs.',
-        missingPoints: ['Performance optimization', 'Scalability decisions', 'Measurable impact']
+        isRelevant: hasContent,
+        score: hasContent ? (isAptitude ? 7.0 : 5.5) : 2.0,
+        confidence: 50,
+        feedback: isAptitude
+          ? '[Fallback] AI scoring unavailable. Numeric aptitude answers need OPENROUTER_API_KEY for exact checking.'
+          : '[Fallback] AI scoring unavailable. Set OPENROUTER_API_KEY in .env and restart the backend.',
+        missingPoints: isAptitude
+          ? (hasContent ? [] : ['Final numeric answer'])
+          : ['Round-specific depth', 'Clear examples'],
       };
       setValidationResult(fallbackValidation);
       return fallbackValidation;
@@ -525,7 +561,8 @@ export function Room() {
             question: firstQuestionFallback(
               selectedConfig.interviewType,
               selectedRole,
-              selectedCompany
+              selectedCompany,
+              createdSessionId
             ),
             category: formatRoundLabel(selectedConfig.interviewType),
             difficulty: selectedConfig.difficulty,

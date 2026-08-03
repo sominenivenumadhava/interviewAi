@@ -70,24 +70,28 @@ public class GeminiAIInterviewEngine implements AIInterviewEngine {
     }
 
     private String buildFirstQuestionPrompt(InterviewContext ctx) {
+        String sessionHint = ctx.getSessionId() != null ? ctx.getSessionId() : java.util.UUID.randomUUID().toString();
         return String.format("""
             You are a Senior %s Interviewer at %s.
             Candidate Name: %s
             Target Role: %s
             Interview Type: %s
             Difficulty Level: %s
+            Interview Session ID: %s
             Resume Context: %s
             Skills: %s
 
             INSTRUCTIONS:
-            - Conduct a real, realistic interview.
+            - Conduct a real, realistic interview for THIS session only.
+            - Generate a completely new Question 1 that is different from common stock openers.
+            - Avoid semantic duplication and repeated wording across sessions.
             - Strict interview type enforcement:
-               * If TECHNICAL: Only technical questions, architecture, CS concepts.
-               * If BEHAVIORAL: Only STAR behavioral questions.
-               * If HR: Only culture fit, salary, motivation, background.
-               * If SYSTEM_DESIGN: Only high level architecture and scalability.
-               * If CODING: Only algorithmic and implementation questions.
-               * If MIXED: Combined round.
+               * If TECHNICAL: Only technical questions, architecture, CS concepts. Do not always start with OOP.
+               * If BEHAVIORAL/HR: Only culture fit, motivation, background, STAR stories — vary the scenario.
+               * If SYSTEM_DESIGN: Only architecture/scalability — do not always pick URL Shortener.
+               * If CODING: Only algorithmic problems — do not always pick Two Sum.
+               * If MANAGERIAL: Leadership/ownership scenarios only.
+               * If APTITUDE: Quantitative/logical/verbal with fresh numbers.
             - Start with a warm professional greeting, introduce yourself, then ask Question 1.
 
             RETURN JSON ONLY with no markdown wrapping:
@@ -109,6 +113,7 @@ public class GeminiAIInterviewEngine implements AIInterviewEngine {
             ctx.getRole(),
             ctx.getInterviewType(),
             ctx.getDifficulty(),
+            sessionHint,
             ctx.getResumeText() != null ? ctx.getResumeText() : "Not provided",
             ctx.getSkills() != null ? String.join(", ", ctx.getSkills()) : "General",
             ctx.getInterviewType(),
@@ -139,6 +144,8 @@ public class GeminiAIInterviewEngine implements AIInterviewEngine {
             - If candidate gave a good technical answer, ask an intelligent deep follow-up (e.g. why X over Y, or how to scale X).
             - If candidate struggled, adapt and ask a foundational follow-up or pivot slightly.
             - Enforce Interview Type: %s. DO NOT generate unrelated question types!
+            - Generate a completely new question different from previously asked ones in the history.
+            - Avoid semantic duplication and repeated wording. Vary follow-ups (optimize, edge cases, memory, large N, parallelize).
             
             RETURN JSON ONLY with no markdown wrapping:
             {
@@ -296,13 +303,70 @@ public class GeminiAIInterviewEngine implements AIInterviewEngine {
     }
 
     private NextQuestionResult createFallbackFirstQuestion(InterviewContext ctx) {
+        String type = ctx.getInterviewType() != null ? ctx.getInterviewType().toUpperCase() : "TECHNICAL";
+        String role = ctx.getRole() != null ? ctx.getRole() : "Engineer";
+        String company = ctx.getCompany() != null ? ctx.getCompany() : "the company";
+        String session = ctx.getSessionId() != null ? ctx.getSessionId() : java.util.UUID.randomUUID().toString();
+        int idx = Math.floorMod(session.hashCode(), 4);
+        String question;
+        if (type.contains("CODING") || type.contains("DSA")) {
+            String[] pool = {
+                    "Reverse nodes of a linked list in groups of k. If the final group has fewer than k nodes, leave it as-is.",
+                    "Group an array of strings into anagram clusters and explain your hashing approach.",
+                    "Given a stream of integers, return the kth largest so far after each insertion.",
+                    "Find whether you can finish all courses given prerequisite edges; return one valid order."
+            };
+            question = pool[idx];
+        } else if (type.contains("SYSTEM")) {
+            String[] pool = {
+                    "Design a notification fan-out system for " + company + " with preferences and rate limits.",
+                    "Design a food-delivery matching platform focusing on ETA and courier assignment.",
+                    "Design a rate limiter service used by many product APIs at " + company + ".",
+                    "Design a payment ledger with idempotent charges and refunds."
+            };
+            question = pool[idx];
+        } else if (type.contains("HR") || type.contains("BEHAVIOR")) {
+            String[] pool = {
+                    "Walk me through a recent project that best shows your fit for " + role + " at " + company + ".",
+                    "Tell me about a time you handled conflict on a cross-functional team.",
+                    "Why " + company + " for your next " + role + " role — beyond brand recognition?",
+                    "Describe a strength peers praise and a growth area you are actively improving."
+            };
+            question = pool[idx];
+        } else if (type.contains("MANAGERIAL") || type.contains("BAR")) {
+            String[] pool = {
+                    "Describe a prioritization call you made as a " + role + " when two P0s collided.",
+                    "Tell me about owning an incident end-to-end and preventing recurrence.",
+                    "Share a time you mentored someone through a performance dip.",
+                    "Describe pushing back on scope that would have hurt reliability."
+            };
+            question = pool[idx];
+        } else if (type.contains("APTITUDE")) {
+            int len = 80 + Math.floorMod(session.hashCode(), 80);
+            int secs = 4 + Math.floorMod(session.hashCode() / 7, 8);
+            String[] pool = {
+                    "A train " + len + " m long passes a pole in " + secs + " seconds. What is its speed in km/h?",
+                    "Ages of A and B are in ratio 3:5 and B is 20 years older than A. Find their ages.",
+                    "Two pipes fill a tank in 12 and 15 hours; a drain empties it in 20. If all open, how long to fill?",
+                    "Find the next number: 2, 6, 12, 20, 30, ?"
+            };
+            question = pool[idx];
+        } else {
+            String[] pool = {
+                    "Explain caching layers and how you would prevent a cache stampede in a " + role + " service.",
+                    "Compare SQL vs NoSQL for a " + role + " workload at " + company + ".",
+                    "Walk through authentication vs authorization for a microservice used by a " + role + ".",
+                    "How would you diagnose a production latency spike in a " + role + " system?"
+            };
+            question = pool[idx];
+        }
         return NextQuestionResult.builder()
                 .transitionPhrase("Welcome! Let's get started with your interview.")
-                .question("Could you introduce yourself and walk me through a complex technical project you worked on recently?")
+                .question(question)
                 .category(ctx.getInterviewType() != null ? ctx.getInterviewType() : "Technical")
                 .difficulty(ctx.getDifficulty() != null ? ctx.getDifficulty() : "Medium")
                 .expectedMinutes(5)
-                .evaluationCriteria(List.of("Clear background summary", "Technical project overview"))
+                .evaluationCriteria(List.of("Clarity", "Depth", "Relevance"))
                 .interviewPhase("WARMUP")
                 .isLastQuestion(false)
                 .suggestedNextDifficulty(ctx.getDifficulty() != null ? ctx.getDifficulty() : "Medium")
@@ -310,13 +374,23 @@ public class GeminiAIInterviewEngine implements AIInterviewEngine {
     }
 
     private NextQuestionResult createFallbackNextQuestion(InterviewContext ctx) {
+        String role = ctx.getRole() != null ? ctx.getRole() : "Engineer";
+        String session = ctx.getSessionId() != null ? ctx.getSessionId() : "x";
+        int n = ctx.getCurrentQuestionNumber() != null ? ctx.getCurrentQuestionNumber() : 2;
+        int idx = Math.floorMod(session.hashCode() + n * 31, 4);
+        String[] pool = {
+                "Can this approach be optimized further for larger inputs?",
+                "What happens for edge cases or empty input in your solution?",
+                "How would you solve this with limited memory?",
+                String.format("Regarding your role as %s, what trade-offs would you revisit under 10x traffic?", role)
+        };
         return NextQuestionResult.builder()
                 .transitionPhrase("Thank you. Moving on to our next topic.")
-                .question(String.format("Regarding your role as %s, how do you handle performance bottlenecks and optimization in production?", ctx.getRole() != null ? ctx.getRole() : "Engineer"))
+                .question(pool[idx])
                 .category(ctx.getInterviewType() != null ? ctx.getInterviewType() : "Technical")
                 .difficulty(ctx.getDifficulty() != null ? ctx.getDifficulty() : "Medium")
                 .expectedMinutes(5)
-                .evaluationCriteria(List.of("Profiling skills", "Optimization strategy"))
+                .evaluationCriteria(List.of("Depth", "Trade-off reasoning"))
                 .interviewPhase("CORE")
                 .isLastQuestion(false)
                 .suggestedNextDifficulty("Medium")

@@ -52,6 +52,12 @@ public class OpenRouterAIService implements AIService {
     }
 
     @Override
+    public Mono<String> generateCreativeStructuredContent(String prompt, String systemInstruction) {
+        String fullPrompt = systemInstruction + "\n\n" + prompt;
+        return generateContent(fullPrompt, OpenRouterRequest.GenerationConfig.creativeConfig());
+    }
+
+    @Override
     public Mono<String> evaluateAnswer(String question, String answer, String expectedCriteria) {
         String systemInstruction =
             "You are an expert interview evaluator. Evaluate the following answer based on the question and criteria.\n\n" +
