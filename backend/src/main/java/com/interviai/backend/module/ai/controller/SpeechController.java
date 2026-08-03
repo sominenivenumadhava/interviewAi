@@ -51,7 +51,7 @@ public class SpeechController {
     @Value("${deepgram.api.base-url:https://api.deepgram.com}")
     private String deepgramBaseUrl;
 
-    @Value("${deepgram.api.listen-url:wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&interim_results=true&punctuate=true&encoding=opus&container=webm}")
+    @Value("${deepgram.api.listen-url:wss://api.deepgram.com/v1/listen?model=nova-2&encoding=linear16&sample_rate=16000&channels=1&punctuate=true&interim_results=true&smart_format=true&endpointing=300}")
     private String deepgramListenUrl;
 
     @Data

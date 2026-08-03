@@ -193,7 +193,8 @@ deepgram:
   api:
     key: ${DEEPGRAM_API_KEY:}
     base-url: ${DEEPGRAM_BASE_URL:https://api.deepgram.com}
-    listen-url: ${DEEPGRAM_LISTEN_URL:wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&interim_results=true&punctuate=true&encoding=opus&container=webm}
+    # Prefer linear16 PCM URL — browser sends raw PCM via AudioContext (more reliable than MediaRecorder webm)
+    listen-url: ${DEEPGRAM_LISTEN_URL:wss://api.deepgram.com/v1/listen?model=nova-2&encoding=linear16&sample_rate=16000&channels=1&punctuate=true&interim_results=true&smart_format=true&endpointing=300}
 
 ---
 spring:
