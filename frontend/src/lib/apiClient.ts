@@ -5,7 +5,12 @@
  * VITE_API_BASE_URL should be the API origin only, e.g. `http://localhost:8082`
  * WITHOUT the `/api/v1` path prefix. Endpoint constants already include `/api/v1/...`.
  * If a base URL accidentally ends with `/api/v1`, it is stripped to avoid double prefixes.
+ *
+ * Local architecture: Vite (:5173) proxies /api → Spring Boot API on port 8082.
+ * There is no separate API gateway port.
  */
+
+import { API_PORT, BACKEND_DOWN_MESSAGE } from '../config/api';
 
 export interface ApiFieldError {
   field: string;
@@ -192,7 +197,7 @@ class ApiClient {
           // Vite proxy often returns bare 500/502 with statusText when Spring is down
           if (response.status >= 500) {
             errorMessage =
-              'Cannot reach the API server. Start the Spring Boot backend on port 8082 and try again.';
+              `Cannot reach the API server. Start the backend on port ${API_PORT} and try again.`;
           } else {
             errorMessage = response.statusText || errorMessage;
           }
@@ -236,7 +241,7 @@ class ApiClient {
         console.error('[ApiClient] ✗ Timeout:', url);
         throw new ApiClientError(
           `Request timed out after ${timeout / 1000} seconds. ` +
-          `Ensure the backend is running on port 8082.`,
+          `Ensure the backend API is running on port ${API_PORT}.`,
           'TIMEOUT',
           408
         );
@@ -254,7 +259,7 @@ class ApiClient {
         // For auth/register, fail immediately with clear message — no retries
         if (endpoint.includes('/register') || endpoint.includes('/login') || endpoint.includes('/auth')) {
           throw new ApiClientError(
-            'Cannot connect to the server. Make sure the Spring Boot backend is running on port 8082.',
+            BACKEND_DOWN_MESSAGE,
             'CONNECTION_REFUSED'
           );
         }

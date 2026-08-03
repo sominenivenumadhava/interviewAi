@@ -271,7 +271,7 @@ export function Register() {
                     <p className="text-xs mt-0.5 opacity-90">{error.general}</p>
                     {error.isNetworkError && (
                       <p className="text-xs text-amber-400/80 mt-1">
-                        Ensure the backend is running on port 8082.
+                        Start the Spring Boot backend on port 8082, then retry. Frontend (5173) proxies /api to that same port.
                       </p>
                     )}
                   </div>
