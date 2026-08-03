@@ -215,8 +215,24 @@ public class SpeechController {
     }
 
     private String buildValidationPrompt(AnswerValidationRequest.Request req) {
+        String round = req.getInterviewType() != null ? req.getInterviewType().trim().toUpperCase() : "TECHNICAL";
+        String criteria = switch (round) {
+            case "CODING", "DSA", "OA" ->
+                "Correctness, Time Complexity, Space Complexity, Edge Cases, Communication, Optimization";
+            case "SYSTEM_DESIGN", "SYSTEMDESIGN" ->
+                "Architecture, Scalability, Trade-offs, Communication";
+            case "HR", "BEHAVIORAL" ->
+                "Communication, Confidence, Personality, Cultural Fit";
+            case "MANAGERIAL", "BAR_RAISER" ->
+                "Decision Making, Ownership, Leadership, Stakeholder Management";
+            case "APTITUDE", "ASSESSMENT" ->
+                "Accuracy, Logical Reasoning, Speed, Clarity of Approach";
+            default ->
+                "Core Concepts, Practical Knowledge, Problem Solving, Confidence";
+        };
+
         return String.format("""
-            You are a Senior Technical Interviewer evaluating a candidate's response in real time.
+            You are evaluating a candidate answer for a %s interview round.
             
             INTERVIEW CONTEXT:
             Target Role: %s
@@ -231,9 +247,9 @@ public class SpeechController {
             
             INSTRUCTIONS & VALIDATION CRITERIA:
             1. First check: Does the candidate transcript ACTUALLY answer the question asked?
-               - If candidate talks about an unrelated topic (e.g. Q: "What is Kafka?", A: "I like Java"), set isRelevant = false, score = 1.0, confidence = 99.
-            2. Evaluate on 10-point scale: Technical Accuracy, Completeness, Communication Clarity, Real Interview Quality.
-            3. Identify missing key points, strengths, and weaknesses.
+               - If unrelated, set isRelevant = false, score = 1.0, confidence = 99.
+            2. Evaluate on a 10-point scale using ONLY these round criteria: %s.
+            3. Identify missing key points, strengths, and weaknesses for THIS round type only.
             
             RETURN JSON ONLY with no markdown wrapping:
             {
@@ -241,17 +257,19 @@ public class SpeechController {
               "score": 8.5,
               "confidence": 95,
               "feedback": "Concise feedback explanation...",
-              "missingPoints": ["Technical challenges", "Performance optimization", "Measurable impact"],
-              "strengths": ["Clear explanation", "Good terminology"],
-              "weaknesses": ["Omitted scalability decisions"],
+              "missingPoints": ["..."],
+              "strengths": ["..."],
+              "weaknesses": ["..."],
               "idealAnswer": "Key points of ideal answer"
             }
             """,
+            round,
             req.getRole() != null ? req.getRole() : "Software Engineer",
             req.getCompany() != null ? req.getCompany() : "Tech Company",
-            req.getInterviewType() != null ? req.getInterviewType() : "TECHNICAL",
+            round,
             req.getQuestion(),
-            req.getTranscript()
+            req.getTranscript(),
+            criteria
         );
     }
 

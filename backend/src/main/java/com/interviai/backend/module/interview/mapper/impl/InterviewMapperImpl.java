@@ -13,7 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
@@ -82,6 +84,7 @@ public class InterviewMapperImpl implements InterviewMapper {
         response.setFollowUpQuestions(new ArrayList<>(question.getFollowUpQuestions()));
         response.setHints(question.getHints());
         response.setIsAnswered(question.isAnswered());
+        response.setMetadata(parseJsonMap(question.getMetadata()));
         
         if (question.getAnswer() != null) {
             response.setAnswer(toAnswerResponse(question.getAnswer()));
@@ -154,6 +157,17 @@ public class InterviewMapperImpl implements InterviewMapper {
         } catch (Exception e) {
             // If not JSON, split by comma
             return List.of(jsonString.split(",\\s*"));
+        }
+    }
+
+    private Map<String, Object> parseJsonMap(String jsonString) {
+        if (jsonString == null || jsonString.trim().isEmpty()) {
+            return new HashMap<>();
+        }
+        try {
+            return objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            return new HashMap<>();
         }
     }
 }

@@ -1,10 +1,10 @@
 package com.interviai.backend.module.interview.dto.response;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import com.interviai.backend.module.interview.enums.DifficultyLevel;
 import lombok.Data;
-
-import java.util.List;
 
 @Data
 public class InterviewQuestionResponse {
@@ -19,4 +19,6 @@ public class InterviewQuestionResponse {
     private String hints;
     private Boolean isAnswered;
     private InterviewAnswerResponse answer;
+    /** Structured extras (coding constraints, samples, complexity, etc.) */
+    private Map<String, Object> metadata;
 }

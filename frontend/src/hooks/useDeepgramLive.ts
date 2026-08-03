@@ -96,6 +96,8 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
   const wantListeningRef = useRef(false);
   const isRecordingRef = useRef(false);
   const handedOffToBrowserRef = useRef(false);
+  /** Fatal WebSpeech errors that must not auto-restart (avoids network-error spam). */
+  const browserFatalErrorRef = useRef(false);
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
@@ -134,6 +136,7 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
   const stopRecording = useCallback((): string => {
     wantListeningRef.current = false;
     handedOffToBrowserRef.current = false;
+    browserFatalErrorRef.current = false;
     clearKeepAlive();
 
     try {
@@ -184,21 +187,35 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
     return fullText;
   }, [setRecordingState]);
 
+  const failBrowserSpeech = useCallback((msg: string) => {
+    browserFatalErrorRef.current = true;
+    wantListeningRef.current = false;
+    setError(msg);
+    setRecordingState(false);
+    setIsConnecting(false);
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.onresult = null;
+        speechRecognitionRef.current.onerror = null;
+        speechRecognitionRef.current.onend = null;
+        speechRecognitionRef.current.abort();
+      } catch { /* ignore */ }
+      speechRecognitionRef.current = null;
+    }
+    optionsRef.current.onError?.(msg);
+  }, [setRecordingState]);
+
   const startBrowserWebSpeech = useCallback((seedTranscript = '') => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      const msg = 'Live Speech Recognition is not supported on this browser. Try Chrome.';
-      setError(msg);
-      setIsConnecting(false);
-      setRecordingState(false);
-      wantListeningRef.current = false;
-      optionsRef.current.onError?.(msg);
+      failBrowserSpeech('Live Speech Recognition is not supported on this browser. Try Chrome.');
       return;
     }
 
     try {
+      browserFatalErrorRef.current = false;
       if (seedTranscript.trim()) {
         finalTranscriptsRef.current = [seedTranscript.trim()];
         currentInterimRef.current = '';
@@ -244,13 +261,17 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
         if (code === 'aborted' || code === 'no-speech') return;
 
         if (code === 'not-allowed') {
-          wantListeningRef.current = false;
-          const msg = 'Microphone permission denied. Please allow microphone access.';
-          setError(msg);
-          setRecordingState(false);
-          setIsConnecting(false);
-          speechRecognitionRef.current = null;
-          optionsRef.current.onError?.(msg);
+          failBrowserSpeech('Microphone permission denied. Please allow microphone access.');
+          return;
+        }
+
+        // Chrome Web Speech talks to Google servers — network/service errors retry forever via onend
+        // unless we stop listening. Prefer Deepgram (DEEPGRAM_API_KEY) for reliable STT.
+        if (code === 'network' || code === 'service-not-allowed') {
+          console.warn('WebSpeech fatal error:', code, e);
+          failBrowserSpeech(
+            'Browser speech failed (network). Set DEEPGRAM_API_KEY in .env and restart the backend for reliable live transcription.'
+          );
           return;
         }
 
@@ -258,7 +279,7 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
       };
 
       recognition.onend = () => {
-        if (!wantListeningRef.current) {
+        if (!wantListeningRef.current || browserFatalErrorRef.current) {
           speechRecognitionRef.current = null;
           return;
         }
@@ -276,14 +297,9 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
       recognition.start();
     } catch (e) {
       console.warn('WebSpeech start error:', e);
-      wantListeningRef.current = false;
-      setIsConnecting(false);
-      setRecordingState(false);
-      const msg = 'Failed to start speech recognition.';
-      setError(msg);
-      optionsRef.current.onError?.(msg);
+      failBrowserSpeech('Failed to start speech recognition.');
     }
-  }, [setRecordingState]);
+  }, [failBrowserSpeech, setRecordingState]);
 
   const startDeepgramPcmStream = useCallback((
     stream: MediaStream,
@@ -436,6 +452,7 @@ export function useDeepgramLive(options: UseDeepgramLiveOptions = {}) {
     currentInterimRef.current = '';
     wantListeningRef.current = true;
     handedOffToBrowserRef.current = false;
+    browserFatalErrorRef.current = false;
 
     try {
       let speechAvailable = false;

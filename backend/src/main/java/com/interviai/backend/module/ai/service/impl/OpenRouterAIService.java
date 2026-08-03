@@ -52,38 +52,6 @@ public class OpenRouterAIService implements AIService {
     }
 
     @Override
-    public Mono<String> generateInterviewQuestions(String resumeText, String role, String difficulty, int count) {
-        String systemInstruction = String.format(
-            "You are an expert interviewer. Based on the supplied candidate and interview context, " +
-            "generate %d %s-level interview questions for a %s position.\n\n" +
-            "Return the response in the following JSON format:\n" +
-            "{\n" +
-            "  \"questions\": [\n" +
-            "    {\n" +
-            "      \"id\": \"q1\",\n" +
-            "      \"question\": \"...\",\n" +
-            "      \"category\": \"technical/behavioral/situational\",\n" +
-            "      \"difficulty\": \"%s\",\n" +
-            "      \"expectedTimeMinutes\": 5,\n" +
-            "      \"evaluationCriteria\": [\"criteria1\", \"criteria2\"],\n" +
-            "      \"followUpQuestions\": [\"followup1\", \"followup2\"]\n" +
-            "    }\n" +
-            "  ]\n" +
-            "}\n\n" +
-            "Ground every question in the supplied role, company, interview round, focus areas, preferred " +
-            "language, job description, or resume details. Respect the requested interview round. " +
-            "Do not substitute generic, standard interview questions when specific context is available. " +
-            "Return raw valid JSON only, without Markdown code fences or explanatory text.",
-            count, difficulty, role, difficulty
-        );
-
-        String prompt = "Candidate and interview context:\n" + resumeText +
-            "\n\nGenerate the personalized interview questions now.";
-
-        return generateStructuredContent(prompt, systemInstruction);
-    }
-
-    @Override
     public Mono<String> evaluateAnswer(String question, String answer, String expectedCriteria) {
         String systemInstruction =
             "You are an expert interview evaluator. Evaluate the following answer based on the question and criteria.\n\n" +

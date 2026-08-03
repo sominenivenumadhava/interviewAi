@@ -13,6 +13,7 @@ import {
   Building2,
   Briefcase,
   TrendingUp,
+  MessageSquare,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -21,7 +22,8 @@ import { useInterviewSession } from '../contexts/InterviewSessionContext';
 import { useAuth } from '../contexts/AuthContext';
 import apiClient, { API_ENDPOINTS } from '../lib/apiClient';
 
-/** Derive a colour + label from a numeric percentage */
+const LAST_EVAL_KEY = 'interviai_last_eval_session';
+
 function scoreColour(pct: number) {
   if (pct >= 80) return 'text-emerald-400';
   if (pct >= 60) return 'text-amber-400';
@@ -41,6 +43,22 @@ function parseHiringProb(raw: unknown): number | null {
   return null;
 }
 
+function clampPct(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+interface QuestionBreakdown {
+  order: number;
+  question: string;
+  category?: string;
+  userAnswer: string;
+  feedback: string;
+  score: number;
+  strengths?: string[];
+  weaknesses?: string[];
+}
+
 interface EvalView {
   overallScore: number;
   hiringProb: number | null;
@@ -48,11 +66,41 @@ interface EvalView {
   strengths: string[];
   improvements: string[];
   detailedFeedback: string;
+  recommendedPractice: string[];
   commScore: number;
   techScore: number;
   problemScore: number;
   confScore: number;
+  correctnessScore: number;
+  optimizationScore: number;
+  timeScore: number;
   weakSkills: string[];
+  questions: QuestionBreakdown[];
+  company: string;
+  role: string;
+  interviewType: string;
+  answeredQuestions: number;
+  totalQuestions: number;
+}
+
+interface LastEvalMeta {
+  sessionId: string;
+  company?: string;
+  role?: string;
+  interviewType?: string;
+  difficulty?: string;
+  currentScore?: number;
+  scoreHistory?: number[];
+  weakSkills?: string[];
+}
+
+function loadLastEvalMeta(): LastEvalMeta | null {
+  try {
+    const raw = sessionStorage.getItem(LAST_EVAL_KEY);
+    return raw ? (JSON.parse(raw) as LastEvalMeta) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function Evaluation() {
@@ -60,14 +108,23 @@ export function Evaluation() {
   const { activeSession, selectedCompany, selectedRole, selectedConfig } = useInterviewSession();
   const { user } = useAuth();
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [apiFallback, setApiFallback] = useState(false);
   const [view, setView] = useState<EvalView | null>(null);
 
-  const buildSessionFallback = (): EvalView => {
-    const overallScore = activeSession?.currentScore ?? 0;
+  const meta = loadLastEvalMeta();
+  const displayCompany = meta?.company || selectedCompany;
+  const displayRole = meta?.role || selectedRole;
+  const displayType = meta?.interviewType || selectedConfig.interviewType;
+
+  const buildSessionFallback = (sessionMeta: LastEvalMeta | null): EvalView => {
+    const overallScore = clampPct(
+      activeSession?.currentScore ?? sessionMeta?.currentScore ?? 0
+    );
     const lastEval = activeSession?.lastEvaluation;
-    const weakSkills = activeSession?.weakSkillsDetected ?? [];
+    const weakSkills =
+      activeSession?.weakSkillsDetected ?? sessionMeta?.weakSkills ?? [];
+    const history = sessionMeta?.scoreHistory ?? [];
 
     return {
       overallScore,
@@ -77,19 +134,38 @@ export function Evaluation() {
         ? [lastEval.feedback]
         : overallScore > 0
           ? ['Strong overall performance throughout the interview session.']
-          : ['Complete the interview to receive personalised feedback.'],
+          : ['Complete the interview and answer questions to receive a scored report.'],
       improvements:
         weakSkills.length > 0
           ? weakSkills
           : overallScore > 0
-            ? ['Review the expected answers to identify gaps in your explanations.']
-            : [],
+            ? ['Review expected answers to deepen explanations.']
+            : ['Answer at least one question before finishing.'],
       detailedFeedback: lastEval?.expectedAnswer || '',
-      commScore: Math.min(100, Math.round(overallScore * 1.05)),
-      techScore: Math.min(100, Math.round(overallScore * 0.97)),
-      problemScore: Math.min(100, Math.round(overallScore * 1.0)),
-      confScore: Math.min(100, Math.round(overallScore * 1.03)),
+      recommendedPractice: [
+        `Practice more ${displayType} rounds for ${displayRole}`,
+        weakSkills[0] ? `Focus on: ${weakSkills[0]}` : 'Schedule another mock interview',
+      ],
+      commScore: clampPct(overallScore * 1.05),
+      techScore: clampPct(overallScore * 0.97),
+      problemScore: clampPct(overallScore),
+      confScore: clampPct(overallScore * 1.03),
+      correctnessScore: clampPct(overallScore),
+      optimizationScore: clampPct(overallScore * 0.95),
+      timeScore: clampPct(overallScore * 0.98),
       weakSkills,
+      questions: history.map((score, i) => ({
+        order: i + 1,
+        question: `Question ${i + 1}`,
+        userAnswer: '(Answer submitted during session)',
+        feedback: lastEval?.feedback || 'See overall feedback.',
+        score: clampPct(score),
+      })),
+      company: displayCompany,
+      role: displayRole,
+      interviewType: displayType,
+      answeredQuestions: history.length,
+      totalQuestions: selectedConfig.numberOfQuestions || history.length,
     };
   };
 
@@ -97,21 +173,27 @@ export function Evaluation() {
     let cancelled = false;
 
     const load = async () => {
-      const sessionId = activeSession?.sessionId;
+      const sessionMeta = loadLastEvalMeta();
+      const sessionId = activeSession?.sessionId || sessionMeta?.sessionId;
+
       if (!sessionId) {
-        setView(buildSessionFallback());
+        setView(buildSessionFallback(sessionMeta));
         setApiFallback(false);
+        setLoading(false);
         return;
       }
 
       setLoading(true);
       try {
-        const res = await apiClient.get<any>(API_ENDPOINTS.EVALUATION.INTERVIEW(sessionId));
+        const res = await apiClient.get<any>(API_ENDPOINTS.EVALUATION.INTERVIEW(sessionId), {
+          timeout: 120000,
+          retry: false,
+        });
         const data = res?.data ?? res;
         if (cancelled || !data) throw new Error('Empty evaluation');
 
         const cats = data.categoryScores || {};
-        const overall = Math.round(Number(data.overallScore ?? 0));
+        const overall = clampPct(Number(data.overallScore ?? 0));
         const apiHiring =
           parseHiringProb(data.hiringProbability) ??
           parseHiringProb(data.hiringProb) ??
@@ -124,7 +206,7 @@ export function Evaluation() {
           (data.skillsAssessment?.demonstratedSkills?.length
             ? data.skillsAssessment.demonstratedSkills
             : null) ||
-          ['Completed interview evaluation available.'];
+          ['Interview evaluation completed.'];
 
         const improvements: string[] =
           (Array.isArray(data.keyImprovements) && data.keyImprovements.length > 0
@@ -135,23 +217,68 @@ export function Evaluation() {
             : null) ||
           [];
 
+        const practice: string[] = Array.isArray(data.recommendedPractice)
+          ? data.recommendedPractice
+          : [];
+
+        const questions: QuestionBreakdown[] = Array.isArray(data.questionPerformances)
+          ? data.questionPerformances.map((q: any) => ({
+              order: Number(q.questionOrder ?? 0),
+              question: q.questionText || '',
+              category: q.category,
+              userAnswer: q.userAnswer || '(No answer text stored)',
+              feedback: q.feedback || 'No per-question feedback.',
+              score: clampPct(Number(q.score ?? 0)),
+              strengths: Array.isArray(q.strengths) ? q.strengths : [],
+              weaknesses: Array.isArray(q.weaknesses) ? q.weaknesses : [],
+            }))
+          : [];
+
+        // Safety: never show 0% when answered questions exist and scores are present
+        let safeOverall = overall;
+        if (
+          (data.answeredQuestions > 0 || questions.length > 0) &&
+          safeOverall <= 0
+        ) {
+          const fromQs = questions.filter((q) => q.score > 0);
+          if (fromQs.length) {
+            safeOverall = clampPct(
+              fromQs.reduce((a, b) => a + b.score, 0) / fromQs.length
+            );
+          } else if (sessionMeta?.currentScore) {
+            safeOverall = clampPct(sessionMeta.currentScore);
+          }
+        }
+
         setView({
-          overallScore: overall,
-          hiringProb: apiHiring ?? (overall > 0 ? estimateHiringProbability(overall) : null),
+          overallScore: safeOverall,
+          hiringProb: apiHiring ?? (safeOverall > 0 ? estimateHiringProbability(safeOverall) : null),
           hiringProbIsEstimate: apiHiring == null,
           strengths,
           improvements,
           detailedFeedback: data.detailedFeedback || data.recommendations || '',
-          commScore: Math.round(Number(cats.communicationScore ?? overall)),
-          techScore: Math.round(Number(cats.technicalScore ?? overall)),
-          problemScore: Math.round(Number(cats.problemSolvingScore ?? overall)),
-          confScore: Math.round(Number(cats.behavioralScore ?? cats.domainKnowledgeScore ?? overall)),
+          recommendedPractice: practice,
+          commScore: clampPct(Number(cats.communicationScore ?? safeOverall)),
+          techScore: clampPct(Number(cats.technicalScore ?? safeOverall)),
+          problemScore: clampPct(Number(cats.problemSolvingScore ?? safeOverall)),
+          confScore: clampPct(
+            Number(cats.confidenceScore ?? cats.behavioralScore ?? safeOverall)
+          ),
+          correctnessScore: clampPct(Number(cats.correctnessScore ?? safeOverall)),
+          optimizationScore: clampPct(Number(cats.optimizationScore ?? safeOverall)),
+          timeScore: clampPct(Number(cats.timeManagementScore ?? safeOverall)),
           weakSkills: data.skillsAssessment?.skillGaps || [],
+          questions,
+          company: data.company || displayCompany,
+          role: data.role || displayRole,
+          interviewType: data.interviewType || displayType,
+          answeredQuestions: Number(data.answeredQuestions ?? questions.length),
+          totalQuestions: Number(data.totalQuestions ?? questions.length),
         });
         setApiFallback(false);
       } catch {
         if (!cancelled) {
-          setView(buildSessionFallback());
+          setView(buildSessionFallback(sessionMeta));
           setApiFallback(true);
         }
       } finally {
@@ -166,18 +293,13 @@ export function Evaluation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession?.sessionId]);
 
-  const focusArea = selectedConfig.focusAreas || 'Core concepts';
   const candidateName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Candidate';
   const candidateEmail = user?.email ?? '';
-
-  const handlePrintReport = () => {
-    window.print();
-  };
 
   if (loading || !view) {
     return (
       <div className="mx-auto max-w-5xl py-20 text-center text-ink-500 dark:text-ink-400">
-        Loading evaluation…
+        Generating AI evaluation report…
       </div>
     );
   }
@@ -189,18 +311,34 @@ export function Evaluation() {
     strengths,
     improvements,
     detailedFeedback,
+    recommendedPractice,
     commScore,
     techScore,
     problemScore,
     confScore,
+    correctnessScore,
+    optimizationScore,
+    timeScore,
     weakSkills,
+    questions,
   } = view;
+
+  const dimensionBars = [
+    { label: 'Communication', value: commScore },
+    { label: 'Technical Depth', value: techScore },
+    { label: 'Problem Solving', value: problemScore },
+    { label: 'Confidence', value: confScore },
+    { label: 'Correctness', value: correctnessScore },
+    { label: 'Optimization', value: optimizationScore },
+    { label: 'Time Management', value: timeScore },
+  ];
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 pb-16">
       {apiFallback && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          Showing session summary — full AI evaluation unavailable
+          Showing session summary — full AI evaluation unavailable. Scores below use recorded
+          answer scores when present.
         </div>
       )}
 
@@ -214,8 +352,11 @@ export function Evaluation() {
           </h1>
           <p className="mt-1 text-ink-500 dark:text-ink-400">
             Target:{' '}
-            <span className="font-semibold text-white">{selectedCompany}</span> — {selectedRole} (
-            {selectedConfig.interviewType})
+            <span className="font-semibold text-white">{view.company}</span> — {view.role} (
+            {view.interviewType})
+          </p>
+          <p className="mt-1 text-xs text-ink-500">
+            Answered {view.answeredQuestions} of {view.totalQuestions} questions
           </p>
 
           <div className="mt-3 flex flex-wrap gap-4">
@@ -231,17 +372,17 @@ export function Evaluation() {
             )}
             <div className="flex items-center gap-1.5 text-sm text-ink-300">
               <Building2 size={14} className="text-teal-400" />
-              <span>{selectedCompany}</span>
+              <span>{view.company}</span>
             </div>
             <div className="flex items-center gap-1.5 text-sm text-ink-300">
               <Briefcase size={14} className="text-emerald-400" />
-              <span>{selectedRole}</span>
+              <span>{view.role}</span>
             </div>
           </div>
         </div>
 
         <div className="flex gap-3 shrink-0">
-          <Button variant="outline" size="sm" onClick={handlePrintReport} className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
             <Printer size={16} />
             Print report
           </Button>
@@ -280,15 +421,17 @@ export function Evaluation() {
           <div className="md:col-span-2 space-y-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-emerald-400">
               <Sparkles size={18} />
-              {apiFallback ? 'Session Summary' : 'AI Senior Bar Raiser Assessment'}
+              {apiFallback ? 'Session Summary' : 'AI Bar Raiser Assessment'}
             </div>
-            <p className="text-xs text-ink-200 leading-relaxed">
+            <p className="text-xs text-ink-200 leading-relaxed whitespace-pre-wrap">
               {detailedFeedback ||
                 (overallScore >= 80
-                  ? `${candidateName} demonstrated strong domain knowledge and structured problem breakdown relevant to a ${selectedRole} role at ${selectedCompany}.`
+                  ? `${candidateName} demonstrated strong domain knowledge for a ${view.role} role at ${view.company}.`
                   : overallScore >= 50
-                    ? `${candidateName} showed a reasonable understanding of ${selectedRole} concepts. There are clear opportunities to sharpen technical depth and conciseness.`
-                    : `${candidateName} is at an early stage for this ${selectedRole} position. Focused practice on the recommended areas below is advised.`)}
+                    ? `${candidateName} showed a reasonable understanding. There are clear opportunities to sharpen depth and structure.`
+                    : view.answeredQuestions === 0
+                      ? 'No answers were submitted, so the score remains at 0%.'
+                      : `${candidateName} is at an early stage for this role. Focused practice on the recommendations below is advised.`)}
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
@@ -357,35 +500,74 @@ export function Evaluation() {
         </Card>
       </div>
 
-      {overallScore > 0 && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TrendingUp size={18} className="text-brand-400" />
+            Score Breakdown
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {dimensionBars.map(({ label, value }) => (
+            <div key={label}>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-ink-300">{label}</span>
+                <span className={`font-semibold ${scoreColour(value)}`}>{value}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-ink-800">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${value}%` }}
+                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                  className={`h-1.5 rounded-full ${
+                    value >= 80 ? 'bg-emerald-400' : value >= 60 ? 'bg-amber-400' : 'bg-red-400'
+                  }`}
+                />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {questions.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <TrendingUp size={18} className="text-brand-400" />
-              Score Breakdown
+              <MessageSquare size={18} className="text-brand-400" />
+              Question-wise Breakdown
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {[
-              { label: 'Communication', value: commScore },
-              { label: 'Technical Depth', value: techScore },
-              { label: 'Problem Solving', value: problemScore },
-              { label: 'Confidence', value: confScore },
-            ].map(({ label, value }) => (
-              <div key={label}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-ink-300">{label}</span>
-                  <span className={`font-semibold ${scoreColour(value)}`}>{value}%</span>
+          <CardContent className="space-y-4">
+            {questions.map((q) => (
+              <div
+                key={q.order}
+                className="rounded-xl border border-ink-700/60 bg-ink-950/40 p-4 space-y-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-brand-400">
+                      Question {q.order}
+                      {q.category ? ` · ${q.category}` : ''}
+                    </p>
+                    <p className="mt-1 text-sm text-ink-100 whitespace-pre-wrap">{q.question}</p>
+                  </div>
+                  <span className={`text-lg font-black shrink-0 ${scoreColour(q.score)}`}>
+                    {q.score}%
+                  </span>
                 </div>
-                <div className="h-1.5 rounded-full bg-ink-800">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${value}%` }}
-                    transition={{ duration: 0.8, ease: 'easeOut' }}
-                    className={`h-1.5 rounded-full ${
-                      value >= 80 ? 'bg-emerald-400' : value >= 60 ? 'bg-amber-400' : 'bg-red-400'
-                    }`}
-                  />
+                <div>
+                  <p className="text-[10px] uppercase text-ink-500 font-semibold mb-1">
+                    Your Answer
+                  </p>
+                  <p className="text-xs text-ink-300 whitespace-pre-wrap rounded-lg bg-ink-900/80 p-3 border border-ink-800">
+                    {q.userAnswer || '(empty)'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase text-ink-500 font-semibold mb-1">
+                    AI Feedback
+                  </p>
+                  <p className="text-xs text-ink-200">{q.feedback}</p>
                 </div>
               </div>
             ))}
@@ -397,31 +579,28 @@ export function Evaluation() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Target size={18} className="text-brand-400" />
-            Recommended Practice Plan for {selectedCompany}
+            Recommended Practice Plan for {view.company}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-3 rounded-xl bg-ink-800/40 border border-ink-700/50 space-y-1">
-            <p className="font-semibold text-brand-400">1. Focus Area</p>
-            <p className="text-ink-300">
-              {focusArea || `Core ${selectedRole} concepts and problem-solving patterns.`}
-            </p>
-          </div>
-          <div className="p-3 rounded-xl bg-ink-800/40 border border-ink-700/50 space-y-1">
-            <p className="font-semibold text-emerald-400">2. Weak Spots to Address</p>
-            <p className="text-ink-300">
-              {weakSkills.length > 0
-                ? weakSkills.slice(0, 2).join('; ') + '.'
-                : 'Keep reinforcing your demonstrated strengths.'}
-            </p>
-          </div>
-          <div className="p-3 rounded-xl bg-ink-800/40 border border-ink-700/50 space-y-1">
-            <p className="font-semibold text-teal-400">3. Interview Type</p>
-            <p className="text-ink-300">
-              Practice more {selectedConfig.interviewType.toLowerCase()} rounds at{' '}
-              {selectedConfig.difficulty} difficulty.
-            </p>
-          </div>
+          {(recommendedPractice.length > 0
+            ? recommendedPractice.slice(0, 3)
+            : [
+                `Core ${view.role} concepts and problem-solving patterns.`,
+                weakSkills.length > 0
+                  ? weakSkills.slice(0, 2).join('; ')
+                  : 'Keep reinforcing demonstrated strengths.',
+                `Practice more ${String(view.interviewType).toLowerCase()} rounds.`,
+              ]
+          ).map((item, i) => (
+            <div
+              key={i}
+              className="p-3 rounded-xl bg-ink-800/40 border border-ink-700/50 space-y-1"
+            >
+              <p className="font-semibold text-brand-400">{i + 1}. Action</p>
+              <p className="text-ink-300">{item}</p>
+            </div>
+          ))}
         </CardContent>
       </Card>
     </div>

@@ -1,5 +1,6 @@
 package com.interviai.backend;
 
+import com.interviai.backend.config.DotenvLoader;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 public class InterviAIApplication {
 
     public static void main(String[] args) {
+        DotenvLoader.load();
         SpringApplication.run(InterviAIApplication.class, args);
     }
 }

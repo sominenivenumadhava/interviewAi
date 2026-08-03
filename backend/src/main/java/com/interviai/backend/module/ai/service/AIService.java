@@ -30,16 +30,6 @@ public interface AIService {
     Mono<String> generateStructuredContent(String prompt, String systemInstruction);
     
     /**
-     * Generate interview questions based on resume
-     * @param resumeText Resume content
-     * @param role Target job role
-     * @param difficulty Difficulty level (EASY, MEDIUM, HARD)
-     * @param count Number of questions
-     * @return Generated questions in JSON format
-     */
-    Mono<String> generateInterviewQuestions(String resumeText, String role, String difficulty, int count);
-    
-    /**
      * Evaluate interview answer
      * @param question The question
      * @param answer User's answer

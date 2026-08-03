@@ -33,8 +33,20 @@ if not exist "frontend\node_modules" (
   popd
 )
 
+REM Load .env into this shell so Spring Boot sees DEEPGRAM_API_KEY, OPENROUTER_API_KEY, etc.
+for /f "usebackq tokens=1,* delims==" %%A in (`findstr /R "^[A-Z0-9_][A-Z0-9_]*=.*" ".env"`) do (
+  if not "%%A"=="" set "%%A=%%B"
+)
+
+if "%DB_PORT%"=="" set DB_PORT=5433
+if "%DB_HOST%"=="" set DB_HOST=localhost
+if "%SPRING_PROFILES_ACTIVE%"=="" set SPRING_PROFILES_ACTIVE=dev
+if "%SERVER_PORT%"=="" set SERVER_PORT=8082
+if "%JWT_SECRET%"=="" set "JWT_SECRET=local-dev-only-jwt-secret-do-not-use-in-prod-404E635266556A586E3272357538782F"
+
 echo [..] Starting BACKEND on http://localhost:8082
-start "InterviAI-Backend" cmd /k "cd /d "%cd%\backend" && mvn spring-boot:run "-Dspring-boot.run.profiles=dev""
+REM Child CMD inherits DEEPGRAM_API_KEY / OPENROUTER_API_KEY / etc. loaded above
+start "InterviAI-Backend" cmd /k "cd /d "%cd%\backend" && mvn spring-boot:run "-Dspring-boot.run.profiles=dev" "-Dspring-boot.run.arguments=--server.port=%SERVER_PORT%""
 
 timeout /t 8 /nobreak >nul
 

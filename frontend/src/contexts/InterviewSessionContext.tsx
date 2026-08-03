@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useState, ReactNode } from 'react';
 
 export interface ActiveInterviewState {
   sessionId: string;
@@ -59,23 +59,30 @@ export const InterviewSessionProvider: React.FC<{ children: ReactNode }> = ({ ch
     difficulty: 'MEDIUM',
     duration: '45',
     language: 'TypeScript',
-    focusAreas: 'System Design & React',
+    focusAreas: 'OOP, DBMS, REST, Microservices & Core Concepts',
     numberOfQuestions: 5
   });
 
   const [activeSession, setActiveSession] = useState<ActiveInterviewState | null>(null);
 
-  const startSessionState = (session: ActiveInterviewState) => {
+  const startSessionState = useCallback((session: ActiveInterviewState) => {
     setActiveSession(session);
-  };
+  }, []);
 
-  const updateSessionState = (partial: Partial<ActiveInterviewState>) => {
-    setActiveSession((prev) => (prev ? { ...prev, ...partial } : null));
-  };
+  const updateSessionState = useCallback((partial: Partial<ActiveInterviewState>) => {
+    setActiveSession((prev) => {
+      if (!prev) return null;
+      const changed = (Object.keys(partial) as (keyof ActiveInterviewState)[]).some(
+        (key) => prev[key] !== partial[key]
+      );
+      if (!changed) return prev;
+      return { ...prev, ...partial };
+    });
+  }, []);
 
-  const endSessionState = () => {
+  const endSessionState = useCallback(() => {
     setActiveSession(null);
-  };
+  }, []);
 
   return (
     <InterviewSessionContext.Provider
