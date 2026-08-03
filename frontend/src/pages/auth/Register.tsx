@@ -236,7 +236,7 @@ export function Register() {
                 </motion.div>
               </Link>
               <h1 className="text-3xl font-black tracking-tight text-white">
-                Join <span className="gradient-text">InterviAI</span>
+                Join <span className="gradient-text">InterviewAI</span>
               </h1>
               <p className="mt-1.5 text-sm text-ink-400">
                 Elevate your career with personalized AI mock interviews

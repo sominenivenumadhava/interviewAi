@@ -112,7 +112,7 @@ export function TopNav() {
               <BrainCircuit size={18} />
             </motion.div>
             <span className="text-[17px] font-extrabold tracking-tight text-ink-900 dark:text-white">
-              InterviAI
+              InterviewAI
             </span>
           </Link>
 
