@@ -1,5 +1,6 @@
 package com.interviai.backend.module.ai.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interviai.backend.common.dto.ApiResponse;
 import com.interviai.backend.module.ai.dto.AnswerValidationRequest;
@@ -18,7 +19,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 @RestController
@@ -28,6 +35,9 @@ import java.util.List;
 public class SpeechController {
 
     private static final Logger log = LoggerFactory.getLogger(SpeechController.class);
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(8))
+            .build();
 
     @Autowired
     private AIService aiService;
@@ -35,8 +45,14 @@ public class SpeechController {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Value("${deepgram.api.key:mock-deepgram-key-dev-proxy}")
+    @Value("${deepgram.api.key:}")
     private String deepgramApiKey;
+
+    @Value("${deepgram.api.base-url:https://api.deepgram.com}")
+    private String deepgramBaseUrl;
+
+    @Value("${deepgram.api.listen-url:wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&interim_results=true&punctuate=true&encoding=opus&container=webm}")
+    private String deepgramListenUrl;
 
     @Data
     @Builder
@@ -48,31 +64,107 @@ public class SpeechController {
         private Long expiresAt;
         private boolean available;
         private String provider;
+        /** "bearer" for temporary JWT, "token" for legacy API-key protocol */
+        private String authScheme;
         private String message;
     }
 
     @GetMapping("/token")
-    @Operation(summary = "Get secure token configuration for Deepgram WebSocket Streaming")
+    @Operation(summary = "Get secure temporary token for Deepgram WebSocket Streaming")
     public ResponseEntity<ApiResponse<DeepgramTokenResponse>> getSpeechToken() {
-        // Never return the master Deepgram API key to the client.
-        // Until temporary-token minting exists, always fall back to browser speech.
         boolean mockOrBlank = deepgramApiKey == null
                 || deepgramApiKey.isBlank()
-                || deepgramApiKey.startsWith("mock-");
+                || deepgramApiKey.startsWith("mock-")
+                || deepgramApiKey.startsWith("your-")
+                || "CHANGE_ME".equalsIgnoreCase(deepgramApiKey);
 
-        String message = mockOrBlank
-                ? "Browser speech will be used. Deepgram API key is not configured."
-                : "Browser speech will be used. Deepgram temporary-token minting is not yet available.";
+        if (mockOrBlank) {
+            DeepgramTokenResponse fallback = DeepgramTokenResponse.builder()
+                    .key(null)
+                    .url(null)
+                    .expiresAt(null)
+                    .available(false)
+                    .provider("browser")
+                    .authScheme(null)
+                    .message("Browser speech will be used. Set DEEPGRAM_API_KEY in .env and restart the backend.")
+                    .build();
+            return ResponseEntity.ok(ApiResponse.success(fallback, "Browser speech fallback configured"));
+        }
 
-        DeepgramTokenResponse token = DeepgramTokenResponse.builder()
-                .key(null)
-                .url(null)
-                .expiresAt(null)
-                .available(false)
-                .provider("browser")
-                .message(message)
+        try {
+            DeepgramTokenResponse token = mintDeepgramTemporaryToken();
+            return ResponseEntity.ok(ApiResponse.success(token, "Deepgram temporary token issued"));
+        } catch (Exception e) {
+            log.warn("Failed to mint Deepgram temporary token, falling back to browser STT: {}", e.getMessage());
+            DeepgramTokenResponse fallback = DeepgramTokenResponse.builder()
+                    .key(null)
+                    .url(null)
+                    .expiresAt(null)
+                    .available(false)
+                    .provider("browser")
+                    .authScheme(null)
+                    .message("Deepgram token minting failed (" + e.getMessage() + "). Browser speech will be used.")
+                    .build();
+            return ResponseEntity.ok(ApiResponse.success(fallback, "Browser speech fallback configured"));
+        }
+    }
+
+    /**
+     * Mint a short-lived JWT via Deepgram /v1/auth/grant so the browser never
+     * receives the master API key. JWT is valid ~30s for the WebSocket handshake.
+     */
+    private DeepgramTokenResponse mintDeepgramTemporaryToken() throws Exception {
+        String grantUrl = deepgramBaseUrl.replaceAll("/$", "") + "/v1/auth/grant";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(grantUrl))
+                .timeout(Duration.ofSeconds(10))
+                .header("Authorization", "Token " + deepgramApiKey.trim())
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"ttl_seconds\":60}"))
                 .build();
-        return ResponseEntity.ok(ApiResponse.success(token, "Browser speech fallback configured"));
+
+        HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new IllegalStateException("Deepgram grant HTTP " + response.statusCode() + ": "
+                    + truncate(response.body(), 200));
+        }
+
+        JsonNode root = objectMapper.readTree(response.body());
+        String accessToken = textOrNull(root, "access_token");
+        if (accessToken == null || accessToken.isBlank()) {
+            // Some older responses used "token"
+            accessToken = textOrNull(root, "token");
+        }
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IllegalStateException("Deepgram grant response missing access_token");
+        }
+
+        double expiresIn = root.has("expires_in") && root.get("expires_in").isNumber()
+                ? root.get("expires_in").asDouble()
+                : 60.0;
+        long expiresAt = Instant.now().plusSeconds(Math.max(1, (long) Math.floor(expiresIn))).toEpochMilli();
+
+        return DeepgramTokenResponse.builder()
+                .key(accessToken)
+                .url(deepgramListenUrl)
+                .expiresAt(expiresAt)
+                .available(true)
+                .provider("deepgram")
+                .authScheme("bearer")
+                .message("Deepgram live STT ready")
+                .build();
+    }
+
+    private static String textOrNull(JsonNode root, String field) {
+        JsonNode node = root.get(field);
+        return node != null && !node.isNull() ? node.asText() : null;
+    }
+
+    private static String truncate(String value, int max) {
+        if (value == null) return "";
+        return value.length() <= max ? value : value.substring(0, max) + "...";
     }
 
     @PostMapping("/validate")
@@ -91,13 +183,6 @@ public class SpeechController {
                 return ResponseEntity.ok(ApiResponse.success(response, "Answer validated successfully"));
             }
         } catch (Exception e) {
-            /*
-             * This application uses Spring MVC with stateless JWT security. Returning
-             * a Mono from this controller caused an async servlet redispatch after the
-             * AI call; that redispatch lost the SecurityContext and converted a valid
-             * request into a misleading 401. Complete the bounded AI call inside the
-             * original authenticated request and preserve the existing fallback.
-             */
             log.warn("Answer validation AI call failed, using fallback: {}", e.getMessage());
         }
 

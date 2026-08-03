@@ -189,6 +189,12 @@ apify:
   actor-id: ${APIFY_ACTOR_ID:hKByXkMQaC5Qt9UMN}
   base-url: ${APIFY_BASE_URL:https://api.apify.com/v2}
 
+deepgram:
+  api:
+    key: ${DEEPGRAM_API_KEY:}
+    base-url: ${DEEPGRAM_BASE_URL:https://api.deepgram.com}
+    listen-url: ${DEEPGRAM_LISTEN_URL:wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&interim_results=true&punctuate=true&encoding=opus&container=webm}
+
 ---
 spring:
   config:

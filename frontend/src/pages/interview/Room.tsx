@@ -172,7 +172,7 @@ export function Room() {
   });
   const submitInFlightRef = useRef(false);
 
-  // Deepgram Live Speech-to-Text Integration
+  // Live Speech-to-Text Integration
   const handleTranscriptUpdate = useCallback((newTranscript: string) => {
     if (newTranscript) {
       setAnswer(newTranscript.slice(0, MAX_ANSWER_LENGTH));
@@ -180,15 +180,20 @@ export function Room() {
     }
   }, []);
 
+  const handleSpeechError = useCallback((err: string) => {
+    setValidationError(err);
+  }, []);
+
   const {
     isRecording,
     isConnecting,
     startRecording,
     stopRecording,
+    provider: sttProvider,
     error: speechError
   } = useDeepgramLive({
     onTranscriptUpdate: handleTranscriptUpdate,
-    onError: (err) => setValidationError(err)
+    onError: handleSpeechError
   });
 
   // Trigger Automatic LLM Answer Validation when user finishes speaking
@@ -234,15 +239,15 @@ export function Room() {
   // Toggle Microphone / Recording
   const handleMicToggle = async () => {
     if (isRecording) {
-      stopRecording();
-      // Auto-validate transcript after recording stops
-      if (answer.trim()) {
-        triggerAutoValidation(answer);
+      const finalText = stopRecording();
+      const textToValidate = (finalText || answer).trim();
+      if (textToValidate) {
+        triggerAutoValidation(textToValidate);
       }
     } else {
       setValidationResult(null);
       setValidationError(null);
-      await startRecording();
+      await startRecording(answer);
     }
   };
 
@@ -708,7 +713,11 @@ export function Room() {
                   {selectedCompany} Senior Bar Raiser
                 </p>
                 <p className="text-ink-400 text-[11px] mt-0.5">
-                  Deepgram STT & Real-Time LLM Validation Active.
+                  {sttProvider === 'deepgram'
+                    ? 'Deepgram Live STT & Real-Time LLM Validation Active.'
+                    : sttProvider === 'browser'
+                      ? 'Browser Speech STT active (Deepgram unavailable or not configured).'
+                      : 'Speech-to-text ready. Click Start Speaking to begin.'}
                 </p>
               </div>
             </div>
@@ -721,7 +730,9 @@ export function Room() {
                   {isRecording ? (
                     <>
                       <Radio size={12} className="animate-pulse text-red-500" />
-                      <span className="text-red-400 font-bold">Deepgram Live Recording...</span>
+                      <span className="text-red-400 font-bold">
+                        {sttProvider === 'deepgram' ? 'Deepgram Live Recording...' : 'Listening...'}
+                      </span>
                     </>
                   ) : (
                     'Microphone Standby'
@@ -781,17 +792,17 @@ export function Room() {
               {isConnecting ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  <span>Connecting Deepgram...</span>
+                  <span>Starting mic...</span>
                 </>
               ) : isRecording ? (
                 <>
                   <MicOff size={20} />
-                  <span>Stop Recording</span>
+                  <span>Stop Listening</span>
                 </>
               ) : (
                 <>
                   <Mic size={20} />
-                  <span>Start Speaking (Deepgram STT)</span>
+                  <span>Start Speaking</span>
                 </>
               )}
             </button>
