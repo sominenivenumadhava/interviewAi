@@ -94,6 +94,21 @@ public class SpeechController {
         try {
             DeepgramTokenResponse token = mintDeepgramTemporaryToken();
             return ResponseEntity.ok(ApiResponse.success(token, "Deepgram temporary token issued"));
+        } catch (InsufficientDeepgramPermissionsException e) {
+            // Usage-scoped keys cannot call /auth/grant. Fall back to token-protocol
+            // WebSocket auth for already-authenticated app users (endpoint requires JWT).
+            log.warn("Deepgram grant forbidden for this API key; using direct token WebSocket auth. "
+                    + "Create a Member-scoped key for short-lived JWTs. {}", e.getMessage());
+            DeepgramTokenResponse token = DeepgramTokenResponse.builder()
+                    .key(deepgramApiKey.trim())
+                    .url(deepgramListenUrl)
+                    .expiresAt(Instant.now().plusSeconds(3600).toEpochMilli())
+                    .available(true)
+                    .provider("deepgram")
+                    .authScheme("token")
+                    .message("Deepgram live STT ready (API key WebSocket auth)")
+                    .build();
+            return ResponseEntity.ok(ApiResponse.success(token, "Deepgram token configured"));
         } catch (Exception e) {
             log.warn("Failed to mint Deepgram temporary token, falling back to browser STT: {}", e.getMessage());
             DeepgramTokenResponse fallback = DeepgramTokenResponse.builder()
@@ -109,9 +124,15 @@ public class SpeechController {
         }
     }
 
+    private static class InsufficientDeepgramPermissionsException extends Exception {
+        InsufficientDeepgramPermissionsException(String message) {
+            super(message);
+        }
+    }
+
     /**
      * Mint a short-lived JWT via Deepgram /v1/auth/grant so the browser never
-     * receives the master API key. JWT is valid ~30s for the WebSocket handshake.
+     * receives the master API key. JWT is valid ~30–60s for the WebSocket handshake.
      */
     private DeepgramTokenResponse mintDeepgramTemporaryToken() throws Exception {
         String grantUrl = deepgramBaseUrl.replaceAll("/$", "") + "/v1/auth/grant";
@@ -126,6 +147,10 @@ public class SpeechController {
                 .build();
 
         HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() == 401 || response.statusCode() == 403) {
+            throw new InsufficientDeepgramPermissionsException(
+                    "Deepgram grant HTTP " + response.statusCode() + ": " + truncate(response.body(), 200));
+        }
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new IllegalStateException("Deepgram grant HTTP " + response.statusCode() + ": "
                     + truncate(response.body(), 200));
@@ -134,7 +159,6 @@ public class SpeechController {
         JsonNode root = objectMapper.readTree(response.body());
         String accessToken = textOrNull(root, "access_token");
         if (accessToken == null || accessToken.isBlank()) {
-            // Some older responses used "token"
             accessToken = textOrNull(root, "token");
         }
         if (accessToken == null || accessToken.isBlank()) {
