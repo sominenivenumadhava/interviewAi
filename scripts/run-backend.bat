@@ -24,5 +24,5 @@ if "%GITHUB_CLIENT_ID%"=="" set GITHUB_CLIENT_ID=placeholder-github-client-id
 if "%GITHUB_CLIENT_SECRET%"=="" set GITHUB_CLIENT_SECRET=placeholder-github-client-secret
 
 cd backend
-mvn spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.arguments=--server.port=%SERVER_PORT%
+mvn spring-boot:run "-Dspring-boot.run.profiles=dev" "-Dspring-boot.run.arguments=--server.port=%SERVER_PORT%"
 endlocal

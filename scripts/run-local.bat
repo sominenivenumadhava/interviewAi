@@ -34,7 +34,7 @@ if not exist "frontend\node_modules" (
 )
 
 echo [..] Starting BACKEND on http://localhost:8082
-start "InterviAI-Backend" cmd /k "cd /d "%cd%\backend" && mvn spring-boot:run -Dspring-boot.run.profiles=dev"
+start "InterviAI-Backend" cmd /k "cd /d "%cd%\backend" && mvn spring-boot:run "-Dspring-boot.run.profiles=dev""
 
 timeout /t 8 /nobreak >nul
 
