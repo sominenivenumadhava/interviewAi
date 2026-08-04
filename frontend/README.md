@@ -99,7 +99,7 @@ npm run test:e2e     # Run end-to-end tests
 ### Development
 Create a `.env.local` file:
 ```env
-VITE_API_BASE_URL=http://localhost:8080/api/v1
+VITE_API_BASE_URL=http://localhost:8082
 VITE_APP_NAME=InterviAI
 VITE_APP_VERSION=1.0.0
 ```
@@ -404,7 +404,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8082',
         changeOrigin: true,
       },
     },

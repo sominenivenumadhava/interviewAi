@@ -1,6 +1,16 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Clock, BrainCircuit, Code, Play, Cpu, UserCheck, Layers } from 'lucide-react';
+import {
+  Settings,
+  Clock,
+  BrainCircuit,
+  Code,
+  Play,
+  Cpu,
+  UserCheck,
+  Calculator,
+  Briefcase
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { cn } from '../../lib/utils';
@@ -12,40 +22,46 @@ export function Config() {
 
   const types = [
     {
+      id: 'HR',
+      name: 'HR Round',
+      icon: UserCheck,
+      desc: 'Background, motivation, strengths & culture fit',
+      focusAreas: 'Motivation, Culture Fit & Soft Skills'
+    },
+    {
       id: 'TECHNICAL',
       name: 'Technical',
       icon: Code,
-      desc: 'Algorithms, Data Structures & CS Concepts'
-    },
-    {
-      id: 'BEHAVIORAL',
-      name: 'Behavioral',
-      icon: BrainCircuit,
-      desc: 'STAR Method, Leadership & Culture Fit'
-    },
-    {
-      id: 'HR',
-      name: 'HR / Screen',
-      icon: UserCheck,
-      desc: 'Career Goals, Salary & Background'
-    },
-    {
-      id: 'SYSTEM_DESIGN',
-      name: 'System Design',
-      icon: Cpu,
-      desc: 'High Level Architecture & Scalability'
+      desc: 'CS concepts, frameworks, APIs & theory',
+      focusAreas: 'OOP, DBMS, REST, Microservices & Core Concepts'
     },
     {
       id: 'CODING',
       name: 'Coding Round',
       icon: Settings,
-      desc: 'Live Problem Solving & Syntax'
+      desc: 'LeetCode-style DSA problems only',
+      focusAreas: 'Arrays, Strings, Trees, Graphs, DP & Binary Search'
     },
     {
-      id: 'MIXED',
-      name: 'Full Loop (Mixed)',
-      icon: Layers,
-      desc: 'Comprehensive Multi-round Interview'
+      id: 'SYSTEM_DESIGN',
+      name: 'System Design',
+      icon: Cpu,
+      desc: 'HLD, scalability, APIs & trade-offs',
+      focusAreas: 'Architecture, Scalability, Caching & DB Design'
+    },
+    {
+      id: 'MANAGERIAL',
+      name: 'Managerial / Bar Raiser',
+      icon: Briefcase,
+      desc: 'Ownership, leadership & decision making',
+      focusAreas: 'Leadership, Ownership, Stakeholders & Prioritization'
+    },
+    {
+      id: 'APTITUDE',
+      name: 'Aptitude / Assessment',
+      icon: Calculator,
+      desc: 'Quant, logical, verbal & puzzles',
+      focusAreas: 'Quantitative, Logical Reasoning & Puzzles'
     }
   ];
 
@@ -53,6 +69,7 @@ export function Config() {
   const durations = ['15', '30', '45', '60'];
   const questionCounts = [5, 10, 15];
   const languages = ['TypeScript', 'Python', 'Java', 'Go', 'Rust', 'C++'];
+  const showLanguage = ['CODING', 'TECHNICAL'].includes(selectedConfig.interviewType);
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
@@ -61,22 +78,28 @@ export function Config() {
           Configure {selectedCompany} Interview
         </h1>
         <p className="mt-1 text-ink-500 dark:text-ink-400">
-          Target Role: <span className="font-semibold text-brand-600 dark:text-brand-400">{selectedRole}</span>. AI will enforce question types based on your selection.
+          Target Role: <span className="font-semibold text-brand-600 dark:text-brand-400">{selectedRole}</span>.
+          Questions are generated strictly for the selected round only.
         </p>
       </div>
 
       <div className="space-y-6">
-        {/* Type Selection */}
         <Card>
           <CardHeader>
-            <CardTitle>Interview Round Type (Enforced)</CardTitle>
+            <CardTitle>Interview Round Type (Strictly Enforced)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {types.map((t) => (
                 <div
                   key={t.id}
-                  onClick={() => setSelectedConfig((prev) => ({ ...prev, interviewType: t.id }))}
+                  onClick={() =>
+                    setSelectedConfig((prev) => ({
+                      ...prev,
+                      interviewType: t.id,
+                      focusAreas: t.focusAreas
+                    }))
+                  }
                   className={cn(
                     'cursor-pointer rounded-xl border p-4 transition-all',
                     selectedConfig.interviewType === t.id
@@ -104,119 +127,117 @@ export function Config() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-          {/* Difficulty */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <Card>
             <CardHeader>
-              <CardTitle>Initial Difficulty</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BrainCircuit size={18} /> Initial Difficulty
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-2">
-                {difficulties.map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setSelectedConfig((prev) => ({ ...prev, difficulty: d }))}
-                    className={cn(
-                      'rounded-lg border px-3 py-2 text-xs font-semibold transition-colors text-left',
-                      selectedConfig.difficulty === d
-                        ? 'border-brand-500 bg-brand-600 text-white'
-                        : 'border-ink-200 bg-white text-ink-700 hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300 dark:hover:bg-ink-800'
-                    )}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
+            <CardContent className="space-y-2">
+              {difficulties.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setSelectedConfig((prev) => ({ ...prev, difficulty: d }))}
+                  className={cn(
+                    'w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
+                    selectedConfig.difficulty === d
+                      ? 'bg-brand-600 text-white'
+                      : 'bg-ink-100 text-ink-700 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-200 dark:hover:bg-ink-700'
+                  )}
+                >
+                  {d}
+                </button>
+              ))}
             </CardContent>
           </Card>
 
-          {/* Question Count */}
           <Card>
             <CardHeader>
-              <CardTitle>Number of Questions</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Settings size={18} /> Number of Questions
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-2">
-                {questionCounts.map((count) => (
-                  <button
-                    key={count}
-                    onClick={() => setSelectedConfig((prev) => ({ ...prev, numberOfQuestions: count }))}
-                    className={cn(
-                      'rounded-lg border px-3 py-2 text-xs font-semibold transition-colors text-left',
-                      selectedConfig.numberOfQuestions === count
-                        ? 'border-brand-500 bg-brand-600 text-white'
-                        : 'border-ink-200 bg-white text-ink-700 hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300 dark:hover:bg-ink-800'
-                    )}
-                  >
-                    {count} Questions
-                  </button>
-                ))}
-              </div>
+            <CardContent className="space-y-2">
+              {questionCounts.map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setSelectedConfig((prev) => ({ ...prev, numberOfQuestions: n }))}
+                  className={cn(
+                    'w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
+                    selectedConfig.numberOfQuestions === n
+                      ? 'bg-brand-600 text-white'
+                      : 'bg-ink-100 text-ink-700 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-200 dark:hover:bg-ink-700'
+                  )}
+                >
+                  {n} Questions
+                </button>
+              ))}
             </CardContent>
           </Card>
 
-          {/* Duration */}
           <Card>
             <CardHeader>
-              <CardTitle>Time Limit</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Clock size={18} /> Time Limit
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-2">
-                {durations.map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setSelectedConfig((prev) => ({ ...prev, duration: d }))}
-                    className={cn(
-                      'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors',
-                      selectedConfig.duration === d
-                        ? 'border-brand-500 bg-brand-600 text-white'
-                        : 'border-ink-200 bg-white text-ink-700 hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300 dark:hover:bg-ink-800'
-                    )}
-                  >
-                    <Clock size={14} />
-                    {d} Minutes
-                  </button>
-                ))}
-              </div>
+            <CardContent className="space-y-2">
+              {durations.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setSelectedConfig((prev) => ({ ...prev, duration: d }))}
+                  className={cn(
+                    'w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
+                    selectedConfig.duration === d
+                      ? 'bg-brand-600 text-white'
+                      : 'bg-ink-100 text-ink-700 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-200 dark:hover:bg-ink-700'
+                  )}
+                >
+                  {d} Minutes
+                </button>
+              ))}
             </CardContent>
           </Card>
         </div>
 
-        {/* Language Selection */}
-        {(selectedConfig.interviewType === 'TECHNICAL' || selectedConfig.interviewType === 'CODING') && (
+        {showLanguage && (
           <Card>
             <CardHeader>
-              <CardTitle>Preferred Programming Language</CardTitle>
+              <CardTitle className="text-base">Preferred Language</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {languages.map((l) => (
-                  <button
-                    key={l}
-                    onClick={() => setSelectedConfig((prev) => ({ ...prev, language: l }))}
-                    className={cn(
-                      'rounded-lg border px-4 py-2 text-xs font-medium transition-colors',
-                      selectedConfig.language === l
-                        ? 'border-brand-500 bg-brand-600 text-white'
-                        : 'border-ink-200 bg-white text-ink-700 hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300 dark:hover:bg-ink-800'
-                    )}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
+            <CardContent className="flex flex-wrap gap-2">
+              {languages.map((lang) => (
+                <button
+                  key={lang}
+                  onClick={() => setSelectedConfig((prev) => ({ ...prev, language: lang }))}
+                  className={cn(
+                    'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                    selectedConfig.language === lang
+                      ? 'bg-brand-600 text-white'
+                      : 'bg-ink-100 text-ink-700 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-200'
+                  )}
+                >
+                  {lang}
+                </button>
+              ))}
             </CardContent>
           </Card>
         )}
 
-        <div className="flex justify-end pt-4">
+        <div className="flex justify-end pt-2">
           <Button
             size="lg"
-            className="gap-2 shadow-lg"
-            onClick={() => navigate('/interview/room')}
+            className="gap-2"
+            onClick={() => {
+              try {
+                sessionStorage.removeItem('interviai_room_state');
+              } catch (_) {}
+              navigate('/interview/room');
+            }}
           >
             <Play size={18} />
-            Start AI Interview Session
+            Start Interview
           </Button>
         </div>
       </div>

@@ -131,6 +131,15 @@ public class OpenRouterRequest {
             return config;
         }
 
+        /** High-variance config for interview question generation (avoid repeated questions). */
+        public static GenerationConfig creativeConfig() {
+            GenerationConfig config = new GenerationConfig();
+            config.temperature = 0.95;
+            config.topP = 0.95;
+            config.maxOutputTokens = 4096;
+            return config;
+        }
+
         public Double getTemperature() {
             return temperature;
         }

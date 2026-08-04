@@ -10,9 +10,10 @@ import {
   Lightbulb,
   Send,
   Loader2,
-  Sparkles,
   AlertTriangle,
-  Radio
+  Radio,
+  Pause,
+  Play
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -47,6 +48,7 @@ interface PersistedRoomState {
   answer: string;
   scoreHistory: number[];
   currentDifficulty: string;
+  isPaused?: boolean;
 }
 
 function saveRoomState(state: PersistedRoomState) {
@@ -68,6 +70,142 @@ function clearRoomState() {
   try {
     sessionStorage.removeItem(ROOM_STORAGE_KEY);
   } catch (_) {}
+}
+
+function formatRoundLabel(interviewType: string): string {
+  const labels: Record<string, string> = {
+    HR: 'HR',
+    TECHNICAL: 'Technical',
+    CODING: 'Coding',
+    SYSTEM_DESIGN: 'System Design',
+    MANAGERIAL: 'Managerial',
+    APTITUDE: 'Aptitude',
+    BEHAVIORAL: 'HR',
+    MIXED: 'Technical'
+  };
+  return labels[interviewType] || interviewType;
+}
+
+/** Always show the selected round label (legacy categories remapped). */
+function resolveQuestionCategory(category: string | undefined, interviewType: string): string {
+  if (interviewType && interviewType !== 'MIXED') {
+    return formatRoundLabel(interviewType);
+  }
+  if (!category) return formatRoundLabel(interviewType || 'TECHNICAL');
+  const normalized = category.trim().toLowerCase();
+  const map: Record<string, string> = {
+    technical: 'Technical',
+    behavioral: 'HR',
+    hr: 'HR',
+    coding: 'Coding',
+    'system design': 'System Design',
+    system_design: 'System Design',
+    managerial: 'Managerial',
+    aptitude: 'Aptitude',
+    situational: 'HR',
+    mixed: 'Technical'
+  };
+  return map[normalized] || category;
+}
+
+function firstQuestionFallback(interviewType: string, role: string, company: string, sessionId?: string): string {
+  const seed = hashSeed(`${sessionId || ''}|${interviewType}|${role}|${company}|${Date.now()}`);
+  const pick = <T,>(arr: T[]) => arr[Math.abs(seed) % arr.length];
+
+  switch (interviewType) {
+    case 'HR':
+    case 'BEHAVIORAL':
+      return pick([
+        `Welcome to the HR round for ${role} at ${company}. Walk me through a recent project that shows your fit for this role.`,
+        `For ${role} at ${company}: tell me about a time you handled conflict on a team.`,
+        `Why ${company} for your next ${role} move — what specifically attracts you?`,
+        `Describe a strength peers praise and a growth area you are actively improving.`
+      ]);
+    case 'CODING':
+      return pick([
+        `[MEDIUM] Reverse Nodes in K-Group (Linked List)\n\nProblem Statement:\nReverse nodes of a linked list in groups of k. If the final group has fewer than k nodes, leave it as-is.\n\nSample Input:\n1->2->3->4->5, k=2\n\nSample Output:\n2->1->4->3->5`,
+        `[MEDIUM] Group Anagrams (Strings)\n\nProblem Statement:\nGroup an array of strings into anagram clusters.\n\nSample Input:\n[eat,tea,tan,ate,nat,bat]\n\nSample Output:\n[[eat,tea,ate],[tan,nat],[bat]]`,
+        `[EASY] Pair Sum Check (HashMap)\n\nProblem Statement:\nGiven nums and target T, return whether any two distinct indices sum to T.\n\nSample Input:\nnums=[1,4,3,2], T=5\n\nSample Output:\ntrue`,
+        `[MEDIUM] Course Order (Graph)\n\nProblem Statement:\nGiven numCourses and prerequisites, return one valid course order if you can finish all courses.\n\nSample Input:\n2, [[1,0]]\n\nSample Output:\n[0,1]`
+      ]);
+    case 'SYSTEM_DESIGN':
+      return pick([
+        `Design a notification fan-out system for ${company}. Cover preferences, rate limits, and duplicate prevention.`,
+        `Design a food-delivery matching platform. Discuss ETA, courier assignment, and surge.`,
+        `Design a rate limiter service used by many APIs at ${company}.`,
+        `Design a payment ledger with idempotent charges and refunds for ${company}.`
+      ]);
+    case 'MANAGERIAL':
+      return pick([
+        `Describe a prioritization call you made as a ${role} when two P0s collided.`,
+        `Tell me about owning an incident end-to-end. How did you prevent recurrence?`,
+        `Share a time you mentored someone through a performance dip.`,
+        `Describe pushing back on scope that would have hurt reliability.`
+      ]);
+    case 'APTITUDE': {
+      const len = 80 + (Math.abs(seed) % 80);
+      const secs = 4 + (Math.abs(seed >> 3) % 8);
+      return pick([
+        `A train ${len} m long passes a pole in ${secs} seconds. What is its speed in km/h? Explain your steps.`,
+        `Ages of A and B are in ratio 3:5 and B is 20 years older than A. Find their ages.`,
+        `Two pipes fill a tank in 12 and 15 hours; a drain empties it in 20. If all open, how long to fill?`,
+        `Find the next number: 2, 6, 12, 20, 30, ? Explain the pattern.`
+      ]);
+    }
+    case 'TECHNICAL':
+    default:
+      return pick([
+        `Explain caching layers (CDN, app, DB) and a stampede you would prevent in a ${role} service at ${company}.`,
+        `Compare SQL vs NoSQL for a ${role} workload at a company like ${company}. When would each hurt?`,
+        `Walk through authentication vs authorization for a microservice used by a ${role}.`,
+        `Describe how you would diagnose a production latency spike in a ${role} system.`
+      ]);
+  }
+}
+
+function hashSeed(input: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h | 0;
+}
+
+function roundInterviewerTitle(interviewType: string): string {
+  switch (interviewType) {
+    case 'CODING':
+      return 'Coding Round Interviewer';
+    case 'SYSTEM_DESIGN':
+      return 'System Design Interviewer';
+    case 'HR':
+    case 'BEHAVIORAL':
+      return 'HR Interviewer';
+    case 'MANAGERIAL':
+      return 'Bar Raiser / Managerial Interviewer';
+    case 'APTITUDE':
+      return 'Aptitude Assessor';
+    default:
+      return 'Technical Interviewer';
+  }
+}
+
+function defaultCriteriaForRound(interviewType: string): string[] {
+  switch (interviewType) {
+    case 'CODING':
+      return ['Correctness', 'Time Complexity', 'Space Complexity', 'Edge Cases', 'Communication', 'Optimization'];
+    case 'SYSTEM_DESIGN':
+      return ['Architecture', 'Scalability', 'Trade-offs', 'Communication'];
+    case 'HR':
+    case 'BEHAVIORAL':
+      return ['Communication', 'Confidence', 'Personality', 'Cultural Fit'];
+    case 'MANAGERIAL':
+      return ['Decision Making', 'Ownership', 'Leadership', 'Stakeholder Management'];
+    case 'APTITUDE':
+      return ['Accuracy', 'Logical Reasoning', 'Speed', 'Clarity of Approach'];
+    default:
+      return ['Core Concepts', 'Practical Knowledge', 'Problem Solving', 'Confidence'];
+  }
 }
 
 export function Room() {
@@ -155,6 +293,15 @@ export function Room() {
 
   const [showHints, setShowHints] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(() => {
+    const saved = loadRoomState();
+    return !!saved?.isPaused;
+  });
+  const isPausedRef = useRef(isPaused);
+  isPausedRef.current = isPaused;
+  const wasRecordingBeforePause = useRef(false);
+  const answerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const stickAnswerToBottomRef = useRef(true);
 
   const [timeLeft, setTimeLeft] = useState(() => {
     const saved = loadRoomState();
@@ -172,8 +319,9 @@ export function Room() {
   });
   const submitInFlightRef = useRef(false);
 
-  // Deepgram Live Speech-to-Text Integration
+  // Live Speech-to-Text Integration — preserve answer scroll while transcript appends
   const handleTranscriptUpdate = useCallback((newTranscript: string) => {
+    if (isPausedRef.current) return;
     if (newTranscript) {
       setAnswer(newTranscript.slice(0, MAX_ANSWER_LENGTH));
       setValidationError(null);
@@ -185,16 +333,26 @@ export function Room() {
     isConnecting,
     startRecording,
     stopRecording,
+    provider: sttProvider,
     error: speechError
   } = useDeepgramLive({
     onTranscriptUpdate: handleTranscriptUpdate,
-    onError: (err) => setValidationError(err)
   });
+
+  // Smooth-scroll answer box when STT appends (only if user is near the bottom)
+  useEffect(() => {
+    const el = answerTextareaRef.current;
+    if (!el || !stickAnswerToBottomRef.current) return;
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    });
+  }, [answer]);
 
   // Trigger Automatic LLM Answer Validation when user finishes speaking
   const triggerAutoValidation = useCallback(async (
     transcriptText: string
   ): Promise<AnswerValidationData | null> => {
+    if (isPausedRef.current) return null;
     if (!transcriptText || transcriptText.trim().length < 5 || !currentQuestion) {
       return null;
     }
@@ -216,13 +374,19 @@ export function Room() {
       return null;
     } catch (e) {
       console.warn('Realtime validation API error, using fallback:', e);
-      // Fallback validation
+      const round = (selectedConfig.interviewType || '').toUpperCase();
+      const isAptitude = ['APTITUDE', 'ASSESSMENT', 'OA'].includes(round);
+      const hasContent = transcriptText.trim().length > 10;
       const fallbackValidation: AnswerValidationData = {
-        isRelevant: transcriptText.trim().length > 10,
-        score: transcriptText.trim().length > 10 ? 8.5 : 2.0,
-        confidence: 94,
-        feedback: 'Good technical response. Remember to explicitly mention measurable metrics and trade-offs.',
-        missingPoints: ['Performance optimization', 'Scalability decisions', 'Measurable impact']
+        isRelevant: hasContent,
+        score: hasContent ? (isAptitude ? 7.0 : 5.5) : 2.0,
+        confidence: 50,
+        feedback: isAptitude
+          ? '[Fallback] AI scoring unavailable. Numeric aptitude answers need OPENROUTER_API_KEY for exact checking.'
+          : '[Fallback] AI scoring unavailable. Set OPENROUTER_API_KEY in .env and restart the backend.',
+        missingPoints: isAptitude
+          ? (hasContent ? [] : ['Final numeric answer'])
+          : ['Round-specific depth', 'Clear examples'],
       };
       setValidationResult(fallbackValidation);
       return fallbackValidation;
@@ -233,18 +397,46 @@ export function Room() {
 
   // Toggle Microphone / Recording
   const handleMicToggle = async () => {
+    if (isPaused) return;
     if (isRecording) {
-      stopRecording();
-      // Auto-validate transcript after recording stops
-      if (answer.trim()) {
-        triggerAutoValidation(answer);
+      const finalText = stopRecording();
+      const textToValidate = (finalText || answer).trim();
+      if (textToValidate) {
+        triggerAutoValidation(textToValidate);
       }
     } else {
       setValidationResult(null);
       setValidationError(null);
-      await startRecording();
+      await startRecording(answer);
     }
   };
+
+  const handlePauseInterview = useCallback(() => {
+    if (isPaused) return;
+    // Freeze question text fully visible
+    if (currentQuestion?.question) {
+      setDisplayedText(currentQuestion.question);
+    }
+    if (isRecording) {
+      wasRecordingBeforePause.current = true;
+      stopRecording();
+    } else {
+      wasRecordingBeforePause.current = false;
+    }
+    setIsPaused(true);
+    updateSessionState({ status: 'paused' });
+  }, [isPaused, currentQuestion, isRecording, stopRecording, updateSessionState]);
+
+  const handleResumeInterview = useCallback(async () => {
+    if (!isPaused) return;
+    setIsPaused(false);
+    updateSessionState({ status: 'in_progress' });
+    if (wasRecordingBeforePause.current) {
+      wasRecordingBeforePause.current = false;
+      setValidationResult(null);
+      await startRecording(answer);
+    }
+  }, [isPaused, updateSessionState, startRecording, answer]);
 
   // ── Persist key room state to sessionStorage on every relevant change ────────
   useEffect(() => {
@@ -256,9 +448,10 @@ export function Room() {
       timeLeft,
       answer,
       scoreHistory,
-      currentDifficulty
+      currentDifficulty,
+      isPaused
     });
-  }, [sessionId, currentQIndex, currentQuestion, timeLeft, answer, scoreHistory, currentDifficulty]);
+  }, [sessionId, currentQIndex, currentQuestion, timeLeft, answer, scoreHistory, currentDifficulty, isPaused]);
 
   // Initialize Interview Session with Backend (or restore from sessionStorage)
   useEffect(() => {
@@ -274,6 +467,7 @@ export function Room() {
       setCurrentQIndex(saved.currentQIndex);
       setCurrentQuestion(saved.currentQuestion);
       setAnswer(saved.answer || '');
+      setIsPaused(!!saved.isPaused);
       // timeLeft, scoreHistory, currentDifficulty already restored in useState initialisers
       startSessionState({
         sessionId: saved.sessionId,
@@ -290,7 +484,7 @@ export function Room() {
         currentDifficulty: saved.currentDifficulty,
         timeRemainingSeconds: saved.timeLeft,
         startedAt: new Date().toISOString(),
-        status: 'in_progress',
+        status: saved.isPaused ? 'paused' : 'in_progress',
         weakSkillsDetected: [],
         lastEvaluation: null
       });
@@ -312,8 +506,12 @@ export function Room() {
           numberOfQuestions: selectedConfig.numberOfQuestions || 5,
           includeCodingQuestions: selectedConfig.interviewType === 'CODING',
           focusAreas: [
-            selectedConfig.focusAreas,
-            selectedConfig.language ? `Preferred language: ${selectedConfig.language}` : ''
+            selectedConfig.focusAreas || selectedConfig.interviewType,
+            selectedConfig.interviewType === 'CODING' && selectedConfig.language
+              ? `Preferred language: ${selectedConfig.language}`
+              : selectedConfig.language && ['TECHNICAL', 'MIXED'].includes(selectedConfig.interviewType)
+                ? `Preferred language: ${selectedConfig.language}`
+                : ''
           ].filter(Boolean).join('; ')
         }, {
           timeout: 60000,
@@ -348,21 +546,28 @@ export function Room() {
           setCurrentQuestion({
             questionNumber: 1,
             question: qData.questionText || qData.question,
-            category: qData.category || selectedConfig.interviewType,
+            category: resolveQuestionCategory(qData.category, selectedConfig.interviewType),
             difficulty: qData.difficultyLevel || selectedConfig.difficulty,
             expectedMinutes: 5,
-            evaluationCriteria: qData.evaluationCriteria || ['Clear technical explanation'],
+            evaluationCriteria: qData.evaluationCriteria?.length
+              ? qData.evaluationCriteria
+              : defaultCriteriaForRound(selectedConfig.interviewType),
             interviewPhase: 'WARMUP',
             isLastQuestion: false
           });
         } else {
           setCurrentQuestion({
             questionNumber: 1,
-            question: `Welcome! Let's start the ${selectedConfig.interviewType.toLowerCase()} interview for ${selectedRole} at ${selectedCompany}. Could you introduce yourself and walk me through a relevant project from your experience?`,
-            category: selectedConfig.interviewType,
+            question: firstQuestionFallback(
+              selectedConfig.interviewType,
+              selectedRole,
+              selectedCompany,
+              createdSessionId
+            ),
+            category: formatRoundLabel(selectedConfig.interviewType),
             difficulty: selectedConfig.difficulty,
             expectedMinutes: 5,
-            evaluationCriteria: ['Clear structure', 'Technical relevance'],
+            evaluationCriteria: defaultCriteriaForRound(selectedConfig.interviewType),
             interviewPhase: 'WARMUP',
             isLastQuestion: false
           });
@@ -383,13 +588,18 @@ export function Room() {
     initSession();
   }, [auth.isLoading, auth.isAuthenticated]);
 
-  // Text Streaming Effect for Question Presentation
+  // Text Streaming Effect for Question Presentation (frozen while paused)
   useEffect(() => {
-    if (!currentQuestion?.question) return;
+    if (!currentQuestion?.question || isPaused) return;
     const text = currentQuestion.question;
     setDisplayedText('');
     let i = 0;
     const interval = setInterval(() => {
+      if (isPausedRef.current) {
+        clearInterval(interval);
+        setDisplayedText(text);
+        return;
+      }
       i++;
       setDisplayedText(text.slice(0, i));
       if (i >= text.length) {
@@ -398,19 +608,20 @@ export function Room() {
     }, 20);
 
     return () => clearInterval(interval);
-  }, [currentQuestion]);
+  }, [currentQuestion, isPaused]);
 
-  // Timer Interval
+  // Timer Interval — frozen while paused
   useEffect(() => {
+    if (isPaused) return;
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        const next = prev > 0 ? prev - 1 : 0;
-        updateSessionState({ timeRemainingSeconds: next });
-        return next;
-      });
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isPaused]);
+
+  useEffect(() => {
+    updateSessionState({ timeRemainingSeconds: timeLeft });
+  }, [timeLeft, updateSessionState]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -420,26 +631,57 @@ export function Room() {
 
   /** EVALUATE_ALL then COMPLETE — used by finish paths */
   const completeInterview = async () => {
-    // Clear persisted state so a new interview starts fresh next time
-    clearRoomState();
-    if (sessionId) {
+    const finishSessionId = sessionId;
+    const avgFromHistory = scoreHistory.length
+      ? Math.round(scoreHistory.reduce((a, b) => a + b, 0) / scoreHistory.length)
+      : 0;
+
+    if (finishSessionId) {
       try {
-        await apiClient.post(API_ENDPOINTS.INTERVIEW.EVALUATE_ALL(sessionId));
+        sessionStorage.setItem(
+          'interviai_last_eval_session',
+          JSON.stringify({
+            sessionId: finishSessionId,
+            company: selectedCompany,
+            role: selectedRole,
+            interviewType: selectedConfig.interviewType,
+            difficulty: currentDifficulty,
+            currentScore: avgFromHistory,
+            scoreHistory,
+            weakSkills: []
+          })
+        );
+      } catch (_) {}
+
+      try {
+        await apiClient.post(API_ENDPOINTS.INTERVIEW.EVALUATE_ALL(finishSessionId), undefined, {
+          timeout: 120000,
+          retry: false
+        });
       } catch (e) {
         console.warn('Failed to evaluate all answers:', e);
       }
       try {
-        await apiClient.post(API_ENDPOINTS.INTERVIEW.COMPLETE(sessionId));
+        await apiClient.post(API_ENDPOINTS.INTERVIEW.COMPLETE(finishSessionId), undefined, {
+          timeout: 60000,
+          retry: false
+        });
       } catch (e) {
         console.warn('Failed to call complete interview endpoint:', e);
       }
     }
+
+    clearRoomState();
     endSessionState();
     navigate('/evaluation');
   };
 
   // Submit Answer & Move to Next Question
   const handleSubmitAnswer = async () => {
+    if (isPaused) {
+      setValidationError('Interview is paused. Resume before submitting.');
+      return;
+    }
     // React state updates are asynchronous, so a rapid second click can arrive
     // before the disabled state renders. Keep an immediate lock as well.
     if (submitInFlightRef.current) return;
@@ -537,10 +779,12 @@ export function Room() {
       setCurrentQuestion({
         questionNumber: currentQIndex + 1,
         question: nextQ.questionText || nextQ.question,
-        category: nextQ.category || selectedConfig.interviewType,
+        category: resolveQuestionCategory(nextQ.category, selectedConfig.interviewType),
         difficulty: nextQ.difficultyLevel || nextDiff,
         expectedMinutes: nextQ.expectedTimeMinutes || 5,
-        evaluationCriteria: nextQ.evaluationCriteria || ['Deep technical breakdown'],
+        evaluationCriteria: nextQ.evaluationCriteria?.length
+          ? nextQ.evaluationCriteria
+          : defaultCriteriaForRound(selectedConfig.interviewType),
         transitionPhrase: nextQ.transitionPhrase || 'Nice work! Moving on.',
         interviewPhase: currentQIndex + 1 === totalQ ? 'CLOSING' : 'CORE',
         isLastQuestion: currentQIndex + 1 === totalQ
@@ -585,14 +829,19 @@ export function Room() {
   const totalQuestions = selectedConfig.numberOfQuestions || 5;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-ink-950 text-white font-sans">
+    <div className="fixed inset-0 z-50 flex flex-col bg-ink-950 text-white font-sans relative">
       {/* Top Bar */}
       <div className="flex h-16 items-center justify-between border-b border-ink-800/80 px-6 bg-ink-900/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
           {/* Timer Pill */}
-          <div className="flex items-center gap-1.5 rounded-xl bg-brand-500/20 border border-brand-500/30 px-3 py-1 text-sm font-bold font-mono text-brand-300 shadow-sm">
+          <div className={`flex items-center gap-1.5 rounded-xl border px-3 py-1 text-sm font-bold font-mono shadow-sm ${
+            isPaused
+              ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+              : 'bg-brand-500/20 border-brand-500/30 text-brand-300'
+          }`}>
             <span>⏱</span>
             <span>{formatTime(timeLeft)}</span>
+            {isPaused && <span className="ml-1 text-[10px] uppercase tracking-wide">Paused</span>}
           </div>
 
           <div className="h-4 w-px bg-ink-800" />
@@ -673,11 +922,13 @@ export function Room() {
               <div className="flex items-center justify-between z-10">
                 <div className="flex items-center gap-2">
                   <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    {!isPaused && (
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    )}
+                    <span className={`relative inline-flex rounded-full h-3 w-3 ${isPaused ? 'bg-amber-400' : 'bg-emerald-500'}`}></span>
                   </span>
-                  <span className="text-xs font-semibold tracking-wide text-emerald-400 uppercase">
-                    AI Senior Interviewer (Active)
+                  <span className={`text-xs font-semibold tracking-wide uppercase ${isPaused ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    AI {roundInterviewerTitle(selectedConfig.interviewType)} ({isPaused ? 'Paused' : 'Active'})
                   </span>
                 </div>
                 <Badge variant="secondary" className="text-[10px]">
@@ -688,27 +939,46 @@ export function Room() {
               {/* Simulated AI Avatar */}
               <div className="my-auto flex flex-col items-center justify-center space-y-3">
                 <motion.div
-                  animate={{
-                    scale: isRecording ? [1, 1.08, 1] : [1, 1.03, 1]
+                  animate={
+                    isPaused
+                      ? { scale: 1 }
+                      : { scale: isRecording ? [1, 1.08, 1] : [1, 1.03, 1] }
+                  }
+                  transition={{
+                    repeat: isPaused ? 0 : Infinity,
+                    duration: isRecording ? 1 : 3
                   }}
-                  transition={{ repeat: Infinity, duration: isRecording ? 1 : 3 }}
-                  className="relative flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-tr from-brand-600 to-purple-600 p-1 shadow-lift"
+                  className={`relative flex h-28 w-28 items-center justify-center rounded-full p-1 shadow-lift ${
+                    isPaused
+                      ? 'bg-gradient-to-tr from-ink-600 to-ink-500'
+                      : 'bg-gradient-to-tr from-brand-600 to-purple-600'
+                  }`}
                 >
                   <div className="flex h-full w-full items-center justify-center rounded-full bg-ink-950 text-4xl">
                     🤖
                   </div>
                 </motion.div>
                 <p className="text-xs text-ink-400 font-medium">
-                  {isRecording ? '🎙 Listening to candidate speech...' : evaluating ? 'Evaluating answer...' : 'Listening & Analyzing'}
+                  {isPaused
+                    ? 'Interview paused'
+                    : isRecording
+                      ? '🎙 Listening to candidate speech...'
+                      : evaluating
+                        ? 'Evaluating answer...'
+                        : 'Listening & Analyzing'}
                 </p>
               </div>
 
               <div className="z-10 rounded-xl bg-black/60 p-3 text-xs backdrop-blur-md border border-white/10">
                 <p className="font-semibold text-brand-300">
-                  {selectedCompany} Senior Bar Raiser
+                  {selectedCompany} · {roundInterviewerTitle(selectedConfig.interviewType)}
                 </p>
                 <p className="text-ink-400 text-[11px] mt-0.5">
-                  Deepgram STT & Real-Time LLM Validation Active.
+                  {sttProvider === 'deepgram'
+                    ? 'Deepgram Live STT & Real-Time LLM Validation Active.'
+                    : sttProvider === 'browser'
+                      ? 'Browser Speech STT active (Deepgram unavailable or not configured).'
+                      : 'Speech-to-text ready. Click Start Speaking to begin.'}
                 </p>
               </div>
             </div>
@@ -718,10 +988,14 @@ export function Room() {
               <div className="flex items-center justify-between z-10">
                 <span className="text-xs font-semibold text-ink-300 uppercase tracking-wider">Candidate Feed</span>
                 <span className="text-xs text-ink-300 flex items-center gap-1">
-                  {isRecording ? (
+                  {isPaused ? (
+                    <span className="text-amber-400 font-bold">Paused</span>
+                  ) : isRecording ? (
                     <>
                       <Radio size={12} className="animate-pulse text-red-500" />
-                      <span className="text-red-400 font-bold">Deepgram Live Recording...</span>
+                      <span className="text-red-400 font-bold">
+                        {sttProvider === 'deepgram' ? 'Deepgram Live Recording...' : 'Listening...'}
+                      </span>
                     </>
                   ) : (
                     'Microphone Standby'
@@ -768,37 +1042,59 @@ export function Room() {
           </div>
 
           {/* Audio / Video Control Buttons */}
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-3 flex-wrap">
             <button
-              disabled={isConnecting}
+              disabled={isConnecting || isPaused}
               onClick={handleMicToggle}
-              className={`flex items-center justify-center gap-2 rounded-full px-6 h-12 text-sm font-semibold shadow-lg transition-all ${
+              className={`flex items-center justify-center gap-2 rounded-full px-5 h-12 text-sm font-semibold shadow-lg transition-all ${
                 isRecording
                   ? 'bg-red-600 hover:bg-red-700 text-white ring-4 ring-red-500/30 animate-pulse'
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40'
-              } disabled:opacity-50`}
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isConnecting ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  <span>Connecting Deepgram...</span>
+                  <span>Starting mic...</span>
                 </>
               ) : isRecording ? (
                 <>
                   <MicOff size={20} />
-                  <span>Stop Recording</span>
+                  <span>Stop Listening</span>
                 </>
               ) : (
                 <>
                   <Mic size={20} />
-                  <span>Start Speaking (Deepgram STT)</span>
+                  <span>Start Speaking</span>
                 </>
               )}
             </button>
 
+            {!isPaused ? (
+              <button
+                onClick={handlePauseInterview}
+                disabled={evaluating || validatingAnswer}
+                className="flex items-center justify-center gap-2 rounded-full px-5 h-12 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 shadow-md transition-all disabled:opacity-50"
+                title="Pause interview"
+              >
+                <Pause size={18} />
+                <span>Pause Interview</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleResumeInterview}
+                className="flex items-center justify-center gap-2 rounded-full px-5 h-12 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md transition-all"
+                title="Resume interview"
+              >
+                <Play size={18} />
+                <span>Resume Interview</span>
+              </button>
+            )}
+
             <button
               onClick={() => setIsVideoOff(!isVideoOff)}
-              className={`flex items-center justify-center rounded-full h-12 w-12 text-white shadow-md transition-all ${
+              disabled={isPaused}
+              className={`flex items-center justify-center rounded-full h-12 w-12 text-white shadow-md transition-all disabled:opacity-50 ${
                 isVideoOff
                   ? 'bg-red-600/90 hover:bg-red-600 border border-red-500/50'
                   : 'bg-ink-800 hover:bg-ink-700 border border-ink-700'
@@ -810,128 +1106,139 @@ export function Room() {
           </div>
         </div>
 
-        {/* Right Sidebar — Question, Answer Textarea & Real-time Validation */}
-        <div className="w-[450px] border-l border-ink-800 bg-ink-900 flex flex-col shadow-2xl">
-          <div className="flex-1 overflow-y-auto p-6 space-y-5">
-            {/* Question Progress Header */}
-            <div className="flex items-center justify-between">
+        {/* Right Sidebar — Sticky Question + Scrollable Answer */}
+        <div className="w-[min(460px,42vw)] min-w-[320px] max-w-[520px] border-l border-ink-800 bg-ink-900 flex flex-col h-full min-h-0 shadow-2xl overflow-hidden">
+          {/* Sticky question region */}
+          <div className="shrink-0 border-b border-ink-800 bg-ink-900/95 backdrop-blur-sm p-4 space-y-3 max-h-[40%] overflow-y-auto">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-brand-400">
                 Question {currentQIndex} of {totalQuestions}
               </span>
-              <Badge variant="outline" className="text-xs">
-                {currentQuestion?.category || selectedConfig.interviewType}
+              <Badge variant="outline" className="text-xs shrink-0">
+                {resolveQuestionCategory(currentQuestion?.category, selectedConfig.interviewType)}
               </Badge>
             </div>
 
-            {/* AI Transition Phrase */}
             {currentQuestion?.transitionPhrase && (
               <p className="text-xs italic text-brand-300 bg-brand-950/40 p-2.5 rounded-lg border border-brand-800/40">
                 💬 "{currentQuestion.transitionPhrase}"
               </p>
             )}
 
-            {/* AI Generated Question Prompt */}
             <div className="rounded-xl bg-ink-950/80 p-4 border border-ink-800 shadow-inner">
-              <h3 className="text-base font-semibold leading-relaxed text-ink-100 min-h-[50px]">
+              <h3
+                className={`text-sm font-semibold leading-relaxed text-ink-100 ${
+                  selectedConfig.interviewType === 'CODING'
+                    ? 'whitespace-pre-wrap font-mono text-xs'
+                    : ''
+                }`}
+              >
                 {displayedText}
-                {displayedText.length < (currentQuestion?.question?.length || 0) && (
-                  <span className="animate-pulse text-brand-400">|</span>
-                )}
+                {!isPaused &&
+                  displayedText.length < (currentQuestion?.question?.length || 0) && (
+                    <span className="animate-pulse text-brand-400">|</span>
+                  )}
               </h3>
             </div>
 
-            {/* Candidate Answer Input Textarea (Updates Live via Deepgram STT) */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-ink-300 flex items-center gap-1.5">
-                  Your Answer (Live STT Transcript)
-                  {isRecording && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-red-400 font-bold animate-pulse">
-                      • Streaming...
-                    </span>
-                  )}
-                </label>
-                <span className={`text-[10px] ${
-                  answer.length >= MAX_ANSWER_LENGTH
-                    ? 'text-red-400'
-                    : answer.length >= MAX_ANSWER_LENGTH * 0.9
-                      ? 'text-amber-400'
-                      : 'text-ink-500'
-                }`}>
-                  {answer.length.toLocaleString()} / {MAX_ANSWER_LENGTH.toLocaleString()} characters
-                </span>
-              </div>
-              <textarea
-                value={answer}
-                onChange={(e) => {
-                  setAnswer(e.target.value);
-                  setValidationError(null);
-                }}
-                maxLength={MAX_ANSWER_LENGTH}
-                placeholder="Click 'Start Speaking' to stream speech live via Deepgram, or type your answer here..."
-                disabled={evaluating}
-                className={`h-40 w-full resize-none rounded-xl border p-4 text-sm text-ink-100 placeholder:text-ink-600 focus:outline-none focus:ring-1 transition-all ${
-                  isRecording
-                    ? 'border-red-500/80 bg-red-950/10 focus:ring-red-500'
-                    : 'border-ink-700 bg-ink-950 focus:border-brand-500 focus:ring-brand-500'
-                }`}
-              />
-            </div>
-
-            {/* Validation Banner Errors */}
-            {validationError && (
-              <div className="rounded-lg bg-red-950/40 border border-red-500/40 p-3 text-xs text-red-300 flex items-center gap-2">
-                <AlertTriangle size={16} className="shrink-0 text-red-400" />
-                <span>{validationError}</span>
-              </div>
-            )}
-
-            {speechError && (
-              <div className="rounded-lg bg-amber-950/40 border border-amber-500/40 p-3 text-xs text-amber-300 flex items-center gap-2">
-                <AlertTriangle size={16} className="shrink-0 text-amber-400" />
-                <span>{speechError}</span>
-              </div>
-            )}
-
-            {/* Real-Time Answer Validation Card Component */}
-            <AnswerValidationCard
-              validation={validationResult}
-              isValidating={validatingAnswer}
-            />
-
-            {/* Hints Accordion */}
             <div>
               <button
                 onClick={() => setShowHints(!showHints)}
                 className="flex items-center gap-2 text-xs font-semibold text-ink-400 hover:text-white transition-colors"
               >
                 <Lightbulb size={14} />
-                {showHints ? 'Hide Evaluation Criteria' : 'Need hints or evaluation criteria?'}
+                {showHints ? 'Hide evaluation criteria' : 'Need hints or evaluation criteria?'}
               </button>
-
               {showHints && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="mt-3 space-y-1.5 rounded-lg bg-ink-800/50 p-3 text-xs text-ink-300 border border-ink-700/50"
-                >
+                <div className="mt-2 space-y-1.5 rounded-lg bg-ink-800/50 p-3 text-xs text-ink-300 border border-ink-700/50">
                   {currentQuestion?.evaluationCriteria.map((c, i) => (
                     <div key={i} className="flex items-start gap-2">
                       <span className="text-brand-400">•</span>
                       <span>{c}</span>
                     </div>
                   ))}
-                </motion.div>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Bottom Action Submit Button */}
-          <div className="border-t border-ink-800 p-6 bg-ink-950 space-y-2">
+          {/* Answer region — fills remaining height, scrolls independently */}
+          <div className="flex-1 min-h-0 flex flex-col p-4 gap-2 overflow-hidden">
+            <div className="flex items-center justify-between shrink-0">
+              <label className="text-xs font-semibold text-ink-300 flex items-center gap-1.5">
+                Your Answer
+                {isRecording && !isPaused && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-red-400 font-bold animate-pulse">
+                    • Streaming...
+                  </span>
+                )}
+              </label>
+              <span
+                className={`text-[10px] ${
+                  answer.length >= MAX_ANSWER_LENGTH
+                    ? 'text-red-400'
+                    : answer.length >= MAX_ANSWER_LENGTH * 0.9
+                      ? 'text-amber-400'
+                      : 'text-ink-500'
+                }`}
+              >
+                {answer.length.toLocaleString()} / {MAX_ANSWER_LENGTH.toLocaleString()}
+              </span>
+            </div>
+
+            <textarea
+              ref={answerTextareaRef}
+              value={answer}
+              onChange={(e) => {
+                setAnswer(e.target.value);
+                setValidationError(null);
+              }}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                stickAnswerToBottomRef.current =
+                  el.scrollHeight - el.scrollTop - el.clientHeight < 56;
+              }}
+              maxLength={MAX_ANSWER_LENGTH}
+              placeholder="Click Start Speaking to stream speech live, or type your answer here..."
+              disabled={evaluating || isPaused}
+              spellCheck
+              className={`flex-1 min-h-[140px] w-full resize-none rounded-xl border p-4 text-sm text-ink-100 placeholder:text-ink-600 focus:outline-none focus:ring-1 overflow-y-auto overscroll-contain leading-relaxed ${
+                isRecording && !isPaused
+                  ? 'border-red-500/80 bg-red-950/10 focus:ring-red-500'
+                  : isPaused
+                    ? 'border-amber-500/40 bg-ink-950/80 opacity-90'
+                    : 'border-ink-700 bg-ink-950 focus:border-brand-500 focus:ring-brand-500'
+              }`}
+            />
+
+            <div className="shrink-0 space-y-2 max-h-[28%] overflow-y-auto">
+              {validationError && (
+                <div className="rounded-lg bg-red-950/40 border border-red-500/40 p-3 text-xs text-red-300 flex items-center gap-2">
+                  <AlertTriangle size={16} className="shrink-0 text-red-400" />
+                  <span>{validationError}</span>
+                </div>
+              )}
+
+              {speechError && (
+                <div className="rounded-lg bg-amber-950/40 border border-amber-500/40 p-3 text-xs text-amber-300 flex items-center gap-2">
+                  <AlertTriangle size={16} className="shrink-0 text-amber-400" />
+                  <span>{speechError}</span>
+                </div>
+              )}
+
+              <AnswerValidationCard
+                validation={validationResult}
+                isValidating={validatingAnswer && !isPaused}
+              />
+            </div>
+          </div>
+
+          {/* Sticky submit */}
+          <div className="shrink-0 border-t border-ink-800 p-4 bg-ink-950 space-y-2">
             <Button
               variant="gradient"
               className="w-full gap-2 shadow-lg h-11 text-sm font-semibold"
-              disabled={evaluating || validatingAnswer}
+              disabled={evaluating || validatingAnswer || isPaused}
               onClick={handleSubmitAnswer}
             >
               {evaluating || validatingAnswer ? (
@@ -941,18 +1248,70 @@ export function Room() {
                 </>
               ) : (
                 <>
-                  {currentQIndex >= totalQuestions ? 'Submit & Complete Interview' : 'Submit & Next Question'}
+                  {currentQIndex >= totalQuestions
+                    ? 'Submit & Complete Interview'
+                    : 'Submit & Next Question'}
                   <Send size={16} />
                 </>
               )}
             </Button>
-
             <p className="text-[10px] text-center text-ink-500">
-              Recording will automatically stop when submitting.
+              {isPaused
+                ? 'Resume the interview to continue answering or submit.'
+                : 'Recording stops automatically when submitting.'}
             </p>
           </div>
         </div>
       </div>
+
+      {/* Pause overlay */}
+      <AnimatePresence>
+        {isPaused && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[60] flex items-center justify-center bg-ink-950/80 backdrop-blur-md px-6"
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="w-full max-w-md rounded-2xl border border-ink-700 bg-ink-900 p-8 text-center shadow-2xl"
+            >
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/20 text-amber-300">
+                <Pause size={28} />
+              </div>
+              <h2 className="text-2xl font-bold text-white">Interview Paused</h2>
+              <p className="mt-2 text-sm text-ink-300">
+                Your interview has been paused. The timer is frozen. Your question, answer, and
+                progress are saved — click Resume to continue exactly where you left off.
+              </p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <Button
+                  variant="gradient"
+                  className="gap-2 flex-1"
+                  onClick={handleResumeInterview}
+                >
+                  <Play size={16} />
+                  Resume Interview
+                </Button>
+                <Button
+                  variant="danger"
+                  className="gap-2 flex-1"
+                  onClick={async () => {
+                    if (isRecording) stopRecording();
+                    await completeInterview();
+                  }}
+                >
+                  <PhoneOff size={16} />
+                  End Interview
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -236,7 +236,7 @@ export function Register() {
                 </motion.div>
               </Link>
               <h1 className="text-3xl font-black tracking-tight text-white">
-                Join <span className="gradient-text">InterviAI</span>
+                Join <span className="gradient-text">InterviewAI</span>
               </h1>
               <p className="mt-1.5 text-sm text-ink-400">
                 Elevate your career with personalized AI mock interviews
@@ -271,7 +271,7 @@ export function Register() {
                     <p className="text-xs mt-0.5 opacity-90">{error.general}</p>
                     {error.isNetworkError && (
                       <p className="text-xs text-amber-400/80 mt-1">
-                        Ensure the backend is running on port 8082.
+                        Run scripts\fix-and-run-local.ps1 (or start backend on port 8082). There is no API gateway — only port 8082.
                       </p>
                     )}
                   </div>

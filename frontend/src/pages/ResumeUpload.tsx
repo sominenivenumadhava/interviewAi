@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileText, CheckCircle2, X, CloudUpload, Star, Loader2 } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, X, CloudUpload, Star, Loader2, Trash2 } from 'lucide-react';
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
 } from '../components/ui/Card';
@@ -36,6 +36,7 @@ export function ResumeUpload() {
   const [loading, setLoading] = useState(true);
   const [resumes, setResumes] = useState<ResumeItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const loadResumes = async () => {
@@ -105,6 +106,20 @@ export function ResumeUpload() {
     } catch (err: any) {
       console.warn('Set primary failed:', err);
       setError(err?.message || 'Could not set primary resume.');
+    }
+  };
+
+  const deleteResume = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this resume?')) return;
+    setDeletingId(id);
+    try {
+      await apiClient.delete(API_ENDPOINTS.RESUME.DELETE(id));
+      await loadResumes();
+    } catch (err: any) {
+      console.warn('Delete resume failed:', err);
+      setError(err?.message || 'Could not delete resume.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -241,6 +256,16 @@ export function ResumeUpload() {
                           Set primary
                         </Button>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors"
+                        onClick={() => deleteResume(resume.id)}
+                        isLoading={deletingId === resume.id}
+                        title="Delete resume"
+                      >
+                        <Trash2 size={16} />
+                      </Button>
                     </div>
                   </CardHeader>
                   {(resume.summary || (resume.skills && resume.skills.length > 0)) && (

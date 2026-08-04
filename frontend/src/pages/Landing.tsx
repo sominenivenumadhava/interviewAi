@@ -281,7 +281,7 @@ export function Landing() {
                 <BrainCircuit size={22} className="text-white" />
               </div>
               <span className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white group-hover:text-brand-500 transition-colors">
-                InterviAI
+                InterviewAI
               </span>
             </Link>
 
@@ -313,7 +313,7 @@ export function Landing() {
 
           <h1 className="gsap-title font-display text-6xl sm:text-8xl lg:text-[120px] font-extrabold tracking-tight leading-[0.95] mb-6">
             <span className="inline-block bg-gradient-to-r from-brand-500 via-cyan-400 to-teal-300 dark:from-brand-300 dark:via-neon-cyan dark:to-cyan-200 bg-clip-text text-transparent drop-shadow-[0_0_40px_rgba(20,184,166,0.35)]">
-              InterviAI
+              InterviewAI
             </span>
           </h1>
 
@@ -390,7 +390,7 @@ export function Landing() {
                 Ready to land your dream offer?
               </h2>
               <p className="max-w-xl text-base text-ink-400">
-                Join thousands of software engineers, product managers, and data scientists practicing smarter with InterviAI.
+                Join thousands of software engineers, product managers, and data scientists practicing smarter with InterviewAI.
               </p>
               <MagneticButton to="/register" variant="primary" className="text-base px-10 py-4 mt-4">
                 Start Your Free Trial Now <ArrowRight size={18} />
@@ -406,10 +406,10 @@ export function Landing() {
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-cyan-500 text-white">
                 <BrainCircuit size={16} />
               </div>
-              <span className="font-extrabold text-white">InterviAI</span>
+              <span className="font-extrabold text-white">InterviewAI</span>
             </div>
             <p className="text-xs text-ink-500">
-              © {new Date().getFullYear()} InterviAI Inc. All rights reserved. Awwwards-inspired frontend design.
+              © {new Date().getFullYear()} InterviewAI Inc. All rights reserved.
             </p>
           </div>
         </footer>

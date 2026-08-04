@@ -46,7 +46,7 @@ function LoadingScreen() {
           ))}
         </div>
 
-        <p className="text-sm text-ink-400 font-medium">Loading InterviAI…</p>
+        <p className="text-sm text-ink-400 font-medium">Loading InterviewAI…</p>
       </motion.div>
     </AnimatedBackground>
   );

@@ -11,6 +11,10 @@ import com.interviai.backend.module.interview.entity.Interview;
 import com.interviai.backend.module.interview.entity.InterviewAnswer;
 import com.interviai.backend.module.interview.entity.InterviewQuestion;
 import com.interviai.backend.module.interview.enums.InterviewStatus;
+import com.interviai.backend.module.interview.enums.InterviewType;
+import com.interviai.backend.module.interview.generation.GeneratedQuestionDraft;
+import com.interviai.backend.module.interview.generation.QuestionGenerationContext;
+import com.interviai.backend.module.interview.generation.QuestionGenerationService;
 import com.interviai.backend.module.interview.mapper.InterviewMapper;
 import com.interviai.backend.module.interview.repository.InterviewAnswerRepository;
 import com.interviai.backend.module.interview.repository.InterviewQuestionRepository;
@@ -59,6 +63,9 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
     
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private QuestionGenerationService questionGenerationService;
     
     @Override
     public List<InterviewQuestionResponse> generateQuestions(String sessionId, UUID userId) {
@@ -70,64 +77,114 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
         }
         
         try {
-            // Get configuration from interview
             Map<String, Object> config = objectMapper.readValue(
-                interview.getConfiguration() != null ? interview.getConfiguration() : "{}", 
+                interview.getConfiguration() != null ? interview.getConfiguration() : "{}",
                 Map.class
             );
             
             int numberOfQuestions = ((Number) config.getOrDefault("numberOfQuestions", 10)).intValue();
             
-            // Prepare resume content
             String resumeContent = "";
+            String skills = "";
             if (interview.getResume() != null) {
                 Resume resume = interview.getResume();
                 resumeContent = buildResumeContent(resume);
+                skills = extractSkillsSummary(resume);
             }
 
-            String interviewContext = buildInterviewContext(interview, config, resumeContent);
-            
-            // Generate questions using AI
-            String questionsJson = aiService.generateInterviewQuestions(
-                interviewContext,
-                interview.getRole(),
-                interview.getDifficultyLevel().name(),
-                numberOfQuestions
-            ).block(); // Blocking for simplicity in this implementation
-            
-            // Parse the generated questions
-            Map<String, Object> generatedData = objectMapper.readValue(extractJsonObject(questionsJson), Map.class);
-            List<Map<String, Object>> questionsList = (List<Map<String, Object>>) generatedData.get("questions");
-            if (questionsList == null || questionsList.isEmpty()) {
-                throw new BusinessException("AI returned no interview questions");
+            String preferredLanguage = null;
+            Object focus = config.get("focusAreas");
+            if (focus != null && focus.toString().toLowerCase().contains("preferred language:")) {
+                preferredLanguage = focus.toString();
             }
-            
+
+            String experienceLevel = null;
+            if (config.get("experienceLevel") != null) {
+                experienceLevel = config.get("experienceLevel").toString();
+            } else if (interview.getDifficultyLevel() != null) {
+                experienceLevel = switch (interview.getDifficultyLevel()) {
+                    case EASY -> "Junior";
+                    case HARD -> "Senior";
+                    default -> "Mid-level";
+                };
+            }
+
+            InterviewType roundType = interview.getInterviewType() != null
+                    ? interview.getInterviewType()
+                    : InterviewType.TECHNICAL;
+
+            QuestionGenerationContext ctx = QuestionGenerationContext.builder()
+                    .interviewType(roundType)
+                    .role(interview.getRole())
+                    .company(interview.getCompany())
+                    .jobDescription(interview.getJobDescription())
+                    .difficulty(interview.getDifficultyLevel())
+                    .questionCount(numberOfQuestions)
+                    .focusAreas(focus != null ? focus.toString() : null)
+                    .customInstructions(config.get("customInstructions") != null
+                            ? config.get("customInstructions").toString() : null)
+                    .resumeContent(resumeContent)
+                    .candidateSkills(skills)
+                    .preferredLanguage(preferredLanguage)
+                    .experienceLevel(experienceLevel)
+                    .sessionId(sessionId)
+                    .build();
+
+            List<GeneratedQuestionDraft> drafts = questionGenerationService.generateForInterview(interview, ctx);
             List<InterviewQuestion> questions = new ArrayList<>();
-            for (int i = 0; i < questionsList.size(); i++) {
-                Map<String, Object> questionData = questionsList.get(i);
-                InterviewQuestion question = createQuestionFromData(interview, questionData, i + 1);
-                questions.add(question);
+            for (int i = 0; i < drafts.size(); i++) {
+                questions.add(toEntity(interview, drafts.get(i), i + 1));
             }
-            
-            // Save all questions
+
             List<InterviewQuestion> savedQuestions = questionRepository.saveAll(questions);
-            
             return interviewMapper.toQuestionResponses(savedQuestions);
             
         } catch (Exception e) {
-            log.warn("Error generating AI questions for interview {}: {}. Generating fallback questions.", sessionId, e.getMessage());
+            log.error("Failed to generate round-aware questions for session {}: {}", sessionId, e.getMessage(), e);
+            throw new BusinessException("Failed to generate interview questions for the selected round");
+        }
+    }
+
+    private InterviewQuestion toEntity(Interview interview, GeneratedQuestionDraft draft, int order) {
+        InterviewQuestion question = new InterviewQuestion();
+        question.setInterview(interview);
+        question.setQuestionOrder(order);
+        question.setQuestionText(draft.getQuestionText());
+        question.setCategory(draft.getCategory() != null
+                ? draft.getCategory()
+                : interview.getInterviewType().canonicalize().getCategoryLabel());
+        question.setDifficultyLevel(draft.getDifficultyLevel() != null
+                ? draft.getDifficultyLevel()
+                : interview.getDifficultyLevel());
+        question.setExpectedTimeMinutes(draft.getExpectedTimeMinutes() != null
+                ? draft.getExpectedTimeMinutes() : 5);
+        if (draft.getEvaluationCriteria() != null) {
+            question.setEvaluationCriteria(new ArrayList<>(draft.getEvaluationCriteria()));
+        }
+        if (draft.getFollowUpQuestions() != null) {
+            question.setFollowUpQuestions(new ArrayList<>(draft.getFollowUpQuestions()));
+        }
+        question.setHints(draft.getHints());
+        question.setReferenceAnswer(draft.getReferenceAnswer());
+        question.setAiGenerated(true);
+        if (draft.getMetadata() != null && !draft.getMetadata().isEmpty()) {
             try {
-                Map<String, Object> config = objectMapper.readValue(
-                    interview.getConfiguration() != null ? interview.getConfiguration() : "{}", 
-                    Map.class
-                );
-                int numberOfQuestions = ((Number) config.getOrDefault("numberOfQuestions", 5)).intValue();
-                return generateFallbackQuestions(interview, numberOfQuestions);
-            } catch (Exception fallbackErr) {
-                log.error("Failed to generate fallback questions for session {}: {}", sessionId, fallbackErr.getMessage());
-                throw new BusinessException("Failed to generate interview questions");
+                question.setMetadata(objectMapper.writeValueAsString(draft.getMetadata()));
+            } catch (Exception e) {
+                log.warn("Failed to serialize question metadata: {}", e.getMessage());
             }
         }
+        return question;
+    }
+
+    private String extractSkillsSummary(Resume resume) {
+        if (resume.getSkills() == null || resume.getSkills().isEmpty()) {
+            return "";
+        }
+        return resume.getSkills().stream()
+                .map(s -> s.getName() != null ? s.getName() : "")
+                .filter(n -> !n.isBlank())
+                .collect(Collectors.joining(", "));
     }
     
     @Override
@@ -272,25 +329,132 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
     @Override
     public List<InterviewAnswerResponse> evaluateAllAnswers(String sessionId, UUID userId) {
         Interview interview = findInterviewBySessionIdAndUser(sessionId, userId);
-        
+
         List<InterviewAnswer> answers = answerRepository.findSubmittedAnswersByInterview(interview);
-        
         List<InterviewAnswerResponse> evaluatedAnswers = new ArrayList<>();
-        
+
         for (InterviewAnswer answer : answers) {
-            if (!answer.isEvaluated()) {
-                InterviewAnswerResponse evaluatedAnswer = evaluateAnswer(
-                    sessionId, 
-                    answer.getQuestion().getQuestionOrder(), 
-                    userId
-                );
-                evaluatedAnswers.add(evaluatedAnswer);
+            boolean missingInsights = answer.getStrengths() == null || answer.getStrengths().isEmpty()
+                    || answer.getImprovements() == null || answer.getImprovements().isEmpty()
+                    || answer.getFeedback() == null || answer.getFeedback().isBlank();
+            if (!answer.isEvaluated() || missingInsights) {
+                evaluatedAnswers.add(evaluateAnswerForced(sessionId, answer.getQuestion().getQuestionOrder(), userId));
             } else {
                 evaluatedAnswers.add(interviewMapper.toAnswerResponse(answer));
             }
         }
-        
+
         return evaluatedAnswers;
+    }
+
+    /**
+     * Always runs AI evaluation and merges insights. Preserves a solid client score
+     * when AI fails, but prefers AI score when available.
+     */
+    private InterviewAnswerResponse evaluateAnswerForced(String sessionId, Integer questionOrder, UUID userId) {
+        Interview interview = findInterviewBySessionIdAndUser(sessionId, userId);
+        InterviewQuestion question = questionRepository.findByInterviewAndQuestionOrder(interview, questionOrder)
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
+        InterviewAnswer answer = answerRepository.findByQuestion(question)
+                .orElseThrow(() -> new ResourceNotFoundException("Answer not found"));
+
+        Double priorScore = answer.getScore();
+        String priorFeedback = answer.getFeedback();
+
+        try {
+            List<String> criteriaList = question.getEvaluationCriteria() != null
+                    ? question.getEvaluationCriteria()
+                    : List.of();
+            String criteria = String.join(", ", criteriaList);
+            if (criteria.isBlank()) {
+                criteria = "Correctness, Clarity, Depth, Communication";
+            }
+
+            String evaluationJson = aiService.evaluateAnswer(
+                    question.getQuestionText(),
+                    answer.getAnswerText() != null ? answer.getAnswerText() : "",
+                    criteria
+            ).block();
+
+            Map<String, Object> evaluation = objectMapper.readValue(extractJsonObject(evaluationJson), Map.class);
+
+            Object scoreObj = evaluation.get("score");
+            if (scoreObj instanceof Number n) {
+                double aiScore = n.doubleValue();
+                // AI prompt may return 0–10 or 0–100 — normalize to 0–100
+                if (aiScore <= 10.0) {
+                    aiScore = aiScore * 10.0;
+                }
+                answer.setScore(Math.max(0.0, Math.min(100.0, aiScore)));
+            } else if (priorScore != null) {
+                answer.setScore(priorScore);
+            }
+
+            if (evaluation.get("rating") instanceof String rating) {
+                answer.setRating(rating);
+            } else if (answer.getScore() != null) {
+                answer.setRating(ratingFromScore(answer.getScore()));
+            }
+
+            if (evaluation.get("strengths") instanceof List<?> strengths) {
+                answer.setStrengths(strengths.stream().map(String::valueOf).toList());
+            }
+            if (evaluation.get("improvements") instanceof List<?> improvements) {
+                answer.setImprovements(improvements.stream().map(String::valueOf).toList());
+            }
+            if (evaluation.get("feedback") instanceof String fb && !fb.isBlank()) {
+                answer.setFeedback(fb);
+            } else if (priorFeedback != null) {
+                answer.setFeedback(priorFeedback);
+            }
+            if (evaluation.get("suggestedAnswer") instanceof String sa) {
+                answer.setSuggestedAnswer(sa);
+            }
+            answer.setAiEvaluation(evaluationJson);
+
+            if (evaluation.get("confidenceScore") instanceof Number n) {
+                answer.setConfidenceScore(n.doubleValue());
+            }
+            if (evaluation.get("clarityScore") instanceof Number n) {
+                answer.setClarityScore(n.doubleValue());
+            }
+            if (evaluation.get("relevanceScore") instanceof Number n) {
+                answer.setRelevanceScore(n.doubleValue());
+            }
+            if (evaluation.get("technicalAccuracyScore") instanceof Number n) {
+                answer.setTechnicalAccuracyScore(n.doubleValue());
+            }
+
+            InterviewAnswer savedAnswer = answerRepository.save(answer);
+            return interviewMapper.toAnswerResponse(savedAnswer);
+        } catch (Exception e) {
+            log.warn("Forced AI evaluation failed for Q{}: {}. Keeping prior score.", questionOrder, e.getMessage());
+            if (answer.getScore() == null && priorScore != null) {
+                answer.setScore(priorScore);
+            }
+            if (answer.getScore() == null) {
+                // Heuristic from answer length so answered questions are never stuck at 0
+                String text = answer.getAnswerText() != null ? answer.getAnswerText().trim() : "";
+                double heuristic = text.isEmpty() ? 0.0
+                        : text.length() < 40 ? 45.0
+                        : text.length() < 120 ? 62.0
+                        : text.length() < 400 ? 74.0 : 82.0;
+                answer.setScore(heuristic);
+                answer.setRating(ratingFromScore(heuristic));
+            }
+            if (answer.getFeedback() == null || answer.getFeedback().isBlank()) {
+                answer.setFeedback(priorFeedback != null ? priorFeedback
+                        : "Answer recorded. Detailed AI critique temporarily unavailable.");
+            }
+            if (answer.getStrengths() == null || answer.getStrengths().isEmpty()) {
+                answer.setStrengths(List.of("Provided a substantive response to the question"));
+            }
+            if (answer.getImprovements() == null || answer.getImprovements().isEmpty()) {
+                answer.setImprovements(List.of("Add more specific examples and measurable outcomes"));
+            }
+            InterviewAnswer savedAnswer = answerRepository.save(answer);
+            return interviewMapper.toAnswerResponse(savedAnswer);
+        }
     }
     
     @Override
@@ -376,38 +540,6 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
         return content.toString();
     }
 
-    private String buildInterviewContext(
-            Interview interview,
-            Map<String, Object> config,
-            String resumeContent
-    ) {
-        StringBuilder context = new StringBuilder();
-        context.append("Target role: ").append(interview.getRole()).append("\n");
-        context.append("Target company: ")
-                .append(hasText(interview.getCompany()) ? interview.getCompany() : "Not specified")
-                .append("\n");
-        context.append("Interview round: ").append(interview.getInterviewType().name()).append("\n");
-        context.append("Difficulty: ").append(interview.getDifficultyLevel().name()).append("\n");
-
-        appendContextValue(context, "Job description", interview.getJobDescription());
-        appendContextValue(context, "Focus areas", config.get("focusAreas"));
-        appendContextValue(context, "Custom instructions", config.get("customInstructions"));
-
-        if (hasText(resumeContent)) {
-            context.append("\nCandidate resume:\n").append(resumeContent.trim()).append("\n");
-        } else {
-            context.append("\nCandidate resume: Not provided\n");
-        }
-
-        return context.toString();
-    }
-
-    private void appendContextValue(StringBuilder context, String label, Object value) {
-        if (value != null && hasText(value.toString())) {
-            context.append(label).append(": ").append(value.toString().trim()).append("\n");
-        }
-    }
-
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
@@ -432,80 +564,5 @@ public class InterviewQuestionServiceImpl implements InterviewQuestionService {
         if (score >= 60) return "SATISFACTORY";
         if (score >= 50) return "NEEDS_IMPROVEMENT";
         return "POOR";
-    }
-    
-    private InterviewQuestion createQuestionFromData(Interview interview, Map<String, Object> data, int order) {
-        InterviewQuestion question = new InterviewQuestion();
-        question.setInterview(interview);
-        question.setQuestionOrder(order);
-        question.setQuestionText((String) data.get("question"));
-        question.setCategory((String) data.get("category"));
-        
-        String difficulty = (String) data.get("difficulty");
-        if (difficulty != null) {
-            question.setDifficultyLevel(interview.getDifficultyLevel());
-        }
-        
-        if (data.containsKey("expectedTimeMinutes")) {
-            question.setExpectedTimeMinutes(((Number) data.get("expectedTimeMinutes")).intValue());
-        }
-        
-        if (data.containsKey("evaluationCriteria")) {
-            question.setEvaluationCriteria((List<String>) data.get("evaluationCriteria"));
-        }
-        
-        if (data.containsKey("followUpQuestions")) {
-            question.setFollowUpQuestions((List<String>) data.get("followUpQuestions"));
-        }
-        
-        question.setAiGenerated(true);
-        
-        return question;
-    }
-
-    private List<InterviewQuestionResponse> generateFallbackQuestions(Interview interview, int numberOfQuestions) {
-        log.info("Generating fallback questions for interview session {}", interview.getSessionId());
-        String role = hasText(interview.getRole()) ? interview.getRole() : "Software Engineer";
-        List<InterviewQuestion> questions = new ArrayList<>();
-        
-        for (int i = 1; i <= Math.max(numberOfQuestions, 1); i++) {
-            InterviewQuestion q = new InterviewQuestion();
-            q.setInterview(interview);
-            q.setQuestionOrder(i);
-            q.setDifficultyLevel(interview.getDifficultyLevel());
-            q.setExpectedTimeMinutes(5);
-            q.setAiGenerated(false);
-
-            if (i == 1) {
-                q.setQuestionText(String.format("Tell me about your background and key experiences relevant to the %s role.", role));
-                q.setCategory("behavioral");
-                q.setEvaluationCriteria(List.of("Clarity of background", "Relevance of experience", "Communication skills"));
-                q.setFollowUpQuestions(List.of("What is your biggest technical achievement?", "Why are you interested in this role?"));
-            } else if (i == 2) {
-                q.setQuestionText(String.format("What key technical concepts, tools, and best practices do you rely on for a %s position?", role));
-                q.setCategory("technical");
-                q.setEvaluationCriteria(List.of("Technical depth", "Tool proficiency", "Problem-solving methodology"));
-                q.setFollowUpQuestions(List.of("Can you walk through a project where you applied these practices?", "How do you stay updated with industry trends?"));
-            } else if (i == 3) {
-                q.setQuestionText("Describe a challenging technical problem you encountered in a recent project and how you resolved it.");
-                q.setCategory("situational");
-                q.setEvaluationCriteria(List.of("Analytical thinking", "Troubleshooting skill", "Resourcefulness"));
-                q.setFollowUpQuestions(List.of("What trade-offs did you consider?", "What would you do differently next time?"));
-            } else if (i == 4) {
-                q.setQuestionText("How do you ensure high quality, performance, and security in your code and architectural designs?");
-                q.setCategory("technical");
-                q.setEvaluationCriteria(List.of("Testing strategy", "Performance tuning", "Security awareness"));
-                q.setFollowUpQuestions(List.of("How do you handle technical debt?", "What automated tools do you use for quality assurance?"));
-            } else {
-                q.setQuestionText(String.format("Question %d: How do you prioritize tasks and collaborate with cross-functional team members under tight deadlines?", i));
-                q.setCategory("behavioral");
-                q.setEvaluationCriteria(List.of("Collaboration", "Time management", "Prioritization strategy"));
-                q.setFollowUpQuestions(List.of("How do you manage scope changes or conflicting priorities?"));
-            }
-            questions.add(q);
-        }
-        
-        List<InterviewQuestion> saved = questionRepository.saveAll(questions);
-        return interviewMapper.toQuestionResponses(saved);
     }
 }

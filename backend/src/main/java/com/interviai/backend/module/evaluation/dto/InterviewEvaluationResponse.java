@@ -14,34 +14,33 @@ public class InterviewEvaluationResponse {
     private String sessionId;
     private String role;
     private String company;
+    private String interviewType;
     private DifficultyLevel difficultyLevel;
     private LocalDateTime completedAt;
-    
-    // Overall scores
+
+    private Integer totalQuestions;
+    private Integer answeredQuestions;
+
+    // Overall scores (0–100)
     private Double overallScore;
     private String overallRating;
-    private String performanceLevel; // EXCELLENT, GOOD, AVERAGE, BELOW_AVERAGE, POOR
-    
-    // Category-wise scores
+    private String performanceLevel;
+    private Double hiringProbability;
+
+    // Dimension scores (0–100)
     private CategoryScores categoryScores;
-    
-    // Strengths and improvements
+
     private List<String> topStrengths;
     private List<String> keyImprovements;
-    
-    // Detailed feedback
+    private List<String> recommendedPractice;
+
     private String detailedFeedback;
     private String recommendations;
-    
-    // Question-wise performance
+
     private List<QuestionPerformance> questionPerformances;
-    
-    // Skills assessment
     private SkillsAssessment skillsAssessment;
-    
-    // Comparison with benchmarks
     private BenchmarkComparison benchmarkComparison;
-    
+
     @Data
     public static class CategoryScores {
         private Double technicalScore;
@@ -49,19 +48,27 @@ public class InterviewEvaluationResponse {
         private Double problemSolvingScore;
         private Double behavioralScore;
         private Double domainKnowledgeScore;
+        private Double correctnessScore;
+        private Double optimizationScore;
+        private Double timeManagementScore;
+        private Double confidenceScore;
     }
-    
+
     @Data
     public static class QuestionPerformance {
         private Integer questionOrder;
         private String questionText;
         private String category;
+        private String userAnswer;
+        private String feedback;
         private Double score;
         private String rating;
         private Long timeTakenSeconds;
         private Boolean exceedsExpectedTime;
+        private List<String> strengths;
+        private List<String> weaknesses;
     }
-    
+
     @Data
     public static class SkillsAssessment {
         private List<SkillRating> technicalSkills;
@@ -69,14 +76,14 @@ public class InterviewEvaluationResponse {
         private List<String> demonstratedSkills;
         private List<String> skillGaps;
     }
-    
+
     @Data
     public static class SkillRating {
         private String skillName;
-        private String proficiencyLevel; // EXPERT, PROFICIENT, COMPETENT, DEVELOPING, NOVICE
+        private String proficiencyLevel;
         private Double score;
     }
-    
+
     @Data
     public static class BenchmarkComparison {
         private Double averageScoreForRole;

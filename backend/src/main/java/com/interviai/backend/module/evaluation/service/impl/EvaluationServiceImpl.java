@@ -72,48 +72,308 @@ public class EvaluationServiceImpl implements EvaluationService {
     public InterviewEvaluationResponse generateInterviewEvaluation(String sessionId, UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
+
         Interview interview = interviewRepository.findBySessionIdWithQuestionsAndAnswers(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Interview not found"));
-        
+
         if (!interview.getUser().getId().equals(userId)) {
             throw new ResourceNotFoundException("Interview not found for user");
         }
-        
-        if (interview.getStatus() != InterviewStatus.COMPLETED) {
+
+        // Allow report for completed interviews; also tolerate just-finished sessions
+        if (interview.getStatus() != InterviewStatus.COMPLETED
+                && interview.getStatus() != InterviewStatus.IN_PROGRESS) {
             throw new IllegalStateException("Interview must be completed for evaluation");
         }
-        
+
         InterviewEvaluationResponse response = new InterviewEvaluationResponse();
         response.setInterviewId(interview.getId());
         response.setSessionId(interview.getSessionId());
         response.setRole(interview.getRole());
         response.setCompany(interview.getCompany());
+        response.setInterviewType(
+                interview.getInterviewType() != null ? interview.getInterviewType().name() : null);
         response.setDifficultyLevel(interview.getDifficultyLevel());
         response.setCompletedAt(interview.getCompletedAt());
-        
-        // Calculate overall score and rating
+        response.setTotalQuestions(interview.getQuestions() != null ? interview.getQuestions().size() : 0);
+
+        long answered = interview.getAnswers() == null ? 0
+                : interview.getAnswers().stream().filter(InterviewAnswer::isSubmitted).count();
+        response.setAnsweredQuestions((int) answered);
+
         calculateOverallScores(interview, response);
-        
-        // Calculate category-wise scores
-        calculateCategoryScores(interview, response);
-        
-        // Analyze question performance
         analyzeQuestionPerformance(interview, response);
-        
-        // Generate strengths and improvements
         generateStrengthsAndImprovements(interview, response);
-        
-        // Perform skills assessment
+        calculateCategoryScores(interview, response);
         performSkillsAssessment(interview, response);
-        
-        // Compare with benchmarks
+
+        // AI holistic report — fills dimensions, strengths, recommendations from real Q&A
+        applyHolisticAiReport(interview, response);
+
         generateBenchmarkComparison(interview, response);
-        
-        // Generate detailed feedback
         generateDetailedFeedback(interview, response);
-        
+
+        // Guard: answered > 0 ⇒ overall must not stay at 0 if answers have content
+        if (response.getAnsweredQuestions() != null
+                && response.getAnsweredQuestions() > 0
+                && (response.getOverallScore() == null || response.getOverallScore() <= 0)) {
+            double recovered = recoverScoreFromAnswers(interview);
+            response.setOverallScore(recovered);
+            response.setOverallRating(determineRating(recovered));
+            response.setPerformanceLevel(determinePerformanceLevel(recovered));
+        }
+
+        if (response.getHiringProbability() == null && response.getOverallScore() != null) {
+            response.setHiringProbability(
+                    (double) Math.min(97, Math.max(8, Math.round(response.getOverallScore() * 0.85 + 10))));
+        }
+
         return response;
+    }
+
+    private double recoverScoreFromAnswers(Interview interview) {
+        List<InterviewAnswer> scored = interview.getAnswers().stream()
+                .filter(a -> a.isSubmitted() && a.getScore() != null && a.getScore() > 0)
+                .toList();
+        if (!scored.isEmpty()) {
+            return scored.stream().mapToDouble(InterviewAnswer::getScore).average().orElse(55.0);
+        }
+        // Content-based heuristic
+        return interview.getAnswers().stream()
+                .filter(InterviewAnswer::isSubmitted)
+                .mapToDouble(a -> {
+                    String t = a.getAnswerText() != null ? a.getAnswerText().trim() : "";
+                    if (t.isEmpty()) return 0;
+                    if (t.length() < 40) return 48;
+                    if (t.length() < 120) return 64;
+                    if (t.length() < 400) return 76;
+                    return 84;
+                })
+                .average()
+                .orElse(0.0);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void applyHolisticAiReport(Interview interview, InterviewEvaluationResponse response) {
+        List<InterviewAnswer> submitted = interview.getAnswers() == null ? List.of()
+                : interview.getAnswers().stream().filter(InterviewAnswer::isSubmitted).toList();
+        if (submitted.isEmpty()) {
+            response.setOverallScore(0.0);
+            response.setTopStrengths(List.of("No answers were submitted for this interview."));
+            response.setKeyImprovements(List.of("Complete at least one question to receive a scored report."));
+            response.setRecommendedPractice(List.of("Retake the interview and answer each question fully."));
+            return;
+        }
+
+        try {
+            String round = interview.getInterviewType() != null
+                    ? interview.getInterviewType().canonicalize().name()
+                    : "TECHNICAL";
+            String criteriaBlock = switch (round) {
+                case "CODING" ->
+                        "Correctness, Approach, Time Complexity, Space Complexity, Edge Cases, Optimization, Communication";
+                case "SYSTEM_DESIGN" ->
+                        "Architecture, Scalability, Database, Caching, Trade-offs, API Design, Communication";
+                case "HR", "BEHAVIORAL" ->
+                        "Communication, Confidence, Leadership, STAR framework, Professionalism, Cultural Fit";
+                case "MANAGERIAL" ->
+                        "Decision Making, Ownership, Leadership, Stakeholder Management, Prioritization";
+                case "APTITUDE" ->
+                        "Accuracy, Logical Reasoning, Speed, Clarity of Approach";
+                default ->
+                        "Concepts, Accuracy, Technical Depth, Practical Knowledge, Examples, Communication";
+            };
+
+            StringBuilder qa = new StringBuilder();
+            for (InterviewAnswer a : submitted) {
+                InterviewQuestion q = a.getQuestion();
+                qa.append("Q").append(q.getQuestionOrder()).append(" [").append(q.getCategory()).append("]\n");
+                qa.append("Question: ").append(q.getQuestionText()).append("\n");
+                qa.append("Candidate Answer: ")
+                        .append(a.getAnswerText() != null && !a.getAnswerText().isBlank()
+                                ? a.getAnswerText() : "(empty)")
+                        .append("\n");
+                if (a.getScore() != null) {
+                    qa.append("Existing score (0-100): ").append(a.getScore()).append("\n");
+                }
+                qa.append("\n");
+            }
+
+            String system = """
+                You are a senior bar-raiser interviewer writing a final interview scorecard for %s at %s.
+                Interview round: %s. Evaluate ONLY from the provided Q&A. Never invent answers the candidate did not give.
+                Round-specific criteria: %s.
+                
+                Return raw JSON only:
+                {
+                  "overallScore": 0-100,
+                  "hiringProbability": 0-100,
+                  "communication": 0-100,
+                  "technicalDepth": 0-100,
+                  "problemSolving": 0-100,
+                  "confidence": 0-100,
+                  "correctness": 0-100,
+                  "optimization": 0-100,
+                  "timeManagement": 0-100,
+                  "strengths": ["..."],
+                  "improvements": ["..."],
+                  "recommendedPractice": ["..."],
+                  "detailedFeedback": "2-4 sentence summary",
+                  "questionFeedback": [
+                    {"order": 1, "score": 0-100, "feedback": "...", "strengths": ["..."], "weaknesses": ["..."]}
+                  ]
+                }
+                
+                Rules:
+                - If the candidate answered with real content, overallScore MUST be > 0.
+                - Empty answers score near 0 for that question only.
+                - Strengths and improvements must reference actual answer content.
+                """.formatted(
+                    interview.getRole() != null ? interview.getRole() : "the role",
+                    interview.getCompany() != null ? interview.getCompany() : "the company",
+                    round,
+                    criteriaBlock
+            );
+
+            String userPrompt = "Interview Q&A:\n" + qa + "\nProduce the final scorecard JSON now.";
+            String raw = aiService.generateStructuredContent(userPrompt, system).block();
+            if (raw == null || raw.isBlank()) {
+                return;
+            }
+
+            int start = raw.indexOf('{');
+            int end = raw.lastIndexOf('}');
+            if (start < 0 || end <= start) {
+                return;
+            }
+            Map<String, Object> report = objectMapper.readValue(raw.substring(start, end + 1), Map.class);
+
+            Double overall = asDouble(report.get("overallScore"));
+            if (overall != null) {
+                response.setOverallScore(clamp100(overall));
+                response.setOverallRating(determineRating(response.getOverallScore()));
+                response.setPerformanceLevel(determinePerformanceLevel(response.getOverallScore()));
+            }
+
+            Double hire = asDouble(report.get("hiringProbability"));
+            if (hire != null) {
+                response.setHiringProbability(clamp100(hire));
+            }
+
+            InterviewEvaluationResponse.CategoryScores cats = response.getCategoryScores();
+            if (cats == null) {
+                cats = new InterviewEvaluationResponse.CategoryScores();
+            }
+            setDim(cats::setCommunicationScore, report.get("communication"));
+            setDim(cats::setTechnicalScore, report.get("technicalDepth"));
+            setDim(cats::setProblemSolvingScore, report.get("problemSolving"));
+            setDim(cats::setConfidenceScore, report.get("confidence"));
+            setDim(cats::setBehavioralScore, report.get("confidence"));
+            setDim(cats::setCorrectnessScore, report.get("correctness"));
+            setDim(cats::setOptimizationScore, report.get("optimization"));
+            setDim(cats::setTimeManagementScore, report.get("timeManagement"));
+            setDim(cats::setDomainKnowledgeScore, report.get("technicalDepth"));
+            // Fill nulls from overall
+            fillNullDims(cats, response.getOverallScore());
+            response.setCategoryScores(cats);
+
+            List<String> strengths = asStringList(report.get("strengths"));
+            if (!strengths.isEmpty()) {
+                response.setTopStrengths(strengths);
+            }
+            List<String> improvements = asStringList(report.get("improvements"));
+            if (!improvements.isEmpty()) {
+                response.setKeyImprovements(improvements);
+            }
+            List<String> practice = asStringList(report.get("recommendedPractice"));
+            if (!practice.isEmpty()) {
+                response.setRecommendedPractice(practice);
+            }
+            if (report.get("detailedFeedback") instanceof String df && !df.isBlank()) {
+                response.setDetailedFeedback(df);
+            }
+
+            // Merge per-question AI feedback
+            if (report.get("questionFeedback") instanceof List<?> qfList
+                    && response.getQuestionPerformances() != null) {
+                Map<Integer, Map<String, Object>> byOrder = new HashMap<>();
+                for (Object item : qfList) {
+                    if (item instanceof Map<?, ?> m) {
+                        Object order = m.get("order");
+                        if (order instanceof Number n) {
+                            byOrder.put(n.intValue(), (Map<String, Object>) m);
+                        }
+                    }
+                }
+                for (InterviewEvaluationResponse.QuestionPerformance perf : response.getQuestionPerformances()) {
+                    Map<String, Object> fb = byOrder.get(perf.getQuestionOrder());
+                    if (fb == null) continue;
+                    Double qs = asDouble(fb.get("score"));
+                    if (qs != null) {
+                        double s = qs <= 10 ? qs * 10 : qs;
+                        perf.setScore(clamp100(s));
+                    }
+                    if (fb.get("feedback") instanceof String f) {
+                        perf.setFeedback(f);
+                    }
+                    List<String> qsStrengths = asStringList(fb.get("strengths"));
+                    if (!qsStrengths.isEmpty()) {
+                        perf.setStrengths(qsStrengths);
+                    }
+                    List<String> qsWeak = asStringList(fb.get("weaknesses"));
+                    if (qsWeak.isEmpty()) {
+                        qsWeak = asStringList(fb.get("improvements"));
+                    }
+                    if (!qsWeak.isEmpty()) {
+                        perf.setWeaknesses(qsWeak);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Holistic AI evaluation unavailable for {}: {}", interview.getSessionId(), e.getMessage());
+        }
+    }
+
+    private void setDim(java.util.function.Consumer<Double> setter, Object raw) {
+        Double v = asDouble(raw);
+        if (v != null) {
+            setter.accept(clamp100(v));
+        }
+    }
+
+    private void fillNullDims(InterviewEvaluationResponse.CategoryScores cats, Double overall) {
+        double fallback = overall != null ? overall : 0.0;
+        if (cats.getCommunicationScore() == null) cats.setCommunicationScore(fallback);
+        if (cats.getTechnicalScore() == null) cats.setTechnicalScore(fallback);
+        if (cats.getProblemSolvingScore() == null) cats.setProblemSolvingScore(fallback);
+        if (cats.getConfidenceScore() == null) cats.setConfidenceScore(fallback);
+        if (cats.getBehavioralScore() == null) cats.setBehavioralScore(fallback);
+        if (cats.getCorrectnessScore() == null) cats.setCorrectnessScore(fallback);
+        if (cats.getOptimizationScore() == null) cats.setOptimizationScore(fallback);
+        if (cats.getTimeManagementScore() == null) cats.setTimeManagementScore(fallback);
+        if (cats.getDomainKnowledgeScore() == null) cats.setDomainKnowledgeScore(fallback);
+    }
+
+    private Double asDouble(Object raw) {
+        if (raw instanceof Number n) return n.doubleValue();
+        if (raw instanceof String s) {
+            try {
+                return Double.parseDouble(s.replace("%", "").trim());
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private List<String> asStringList(Object raw) {
+        if (!(raw instanceof List<?> list)) return List.of();
+        return list.stream().filter(Objects::nonNull).map(String::valueOf)
+                .filter(s -> !s.isBlank()).toList();
+    }
+
+    private double clamp100(double v) {
+        return Math.max(0.0, Math.min(100.0, v));
     }
     
     @Override
@@ -321,53 +581,93 @@ public class EvaluationServiceImpl implements EvaluationService {
     
     private void calculateCategoryScores(Interview interview, InterviewEvaluationResponse response) {
         InterviewEvaluationResponse.CategoryScores scores = new InterviewEvaluationResponse.CategoryScores();
-        
-        Map<String, List<InterviewAnswer>> answersByCategory = interview.getAnswers().stream()
-                .filter(a -> a.getScore() != null && a.getQuestion().getCategory() != null)
-                .collect(Collectors.groupingBy(a -> a.getQuestion().getCategory()));
-        
-        scores.setTechnicalScore(calculateCategoryScore(answersByCategory.get("technical")));
-        scores.setCommunicationScore(calculateCategoryScore(answersByCategory.get("communication")));
-        scores.setProblemSolvingScore(calculateCategoryScore(answersByCategory.get("problem_solving")));
-        scores.setBehavioralScore(calculateCategoryScore(answersByCategory.get("behavioral")));
-        scores.setDomainKnowledgeScore(calculateCategoryScore(answersByCategory.get("domain")));
-        
+
+        List<InterviewAnswer> submitted = interview.getAnswers() == null ? List.of()
+                : interview.getAnswers().stream()
+                .filter(a -> a.isSubmitted() && a.getScore() != null)
+                .toList();
+
+        if (submitted.isEmpty()) {
+            response.setCategoryScores(scores);
+            return;
+        }
+
+        double avg = submitted.stream().mapToDouble(InterviewAnswer::getScore).average().orElse(0);
+        // Seed all dimensions from answer average; AI holistic report overwrites when available
+        scores.setTechnicalScore(avg);
+        scores.setCommunicationScore(Math.min(100, avg * 1.02));
+        scores.setProblemSolvingScore(avg);
+        scores.setBehavioralScore(Math.min(100, avg * 0.98));
+        scores.setDomainKnowledgeScore(avg);
+        scores.setCorrectnessScore(avg);
+        scores.setOptimizationScore(Math.min(100, avg * 0.96));
+        scores.setTimeManagementScore(Math.min(100, avg * 0.97));
+        scores.setConfidenceScore(Math.min(100, avg * 1.01));
+
+        // Refine from answer sub-scores when present
+        submitted.stream()
+                .map(InterviewAnswer::getClarityScore)
+                .filter(Objects::nonNull)
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .ifPresent(v -> scores.setCommunicationScore(clamp100(v <= 10 ? v * 10 : v)));
+        submitted.stream()
+                .map(InterviewAnswer::getTechnicalAccuracyScore)
+                .filter(Objects::nonNull)
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .ifPresent(v -> scores.setTechnicalScore(clamp100(v <= 10 ? v * 10 : v)));
+        submitted.stream()
+                .map(InterviewAnswer::getConfidenceScore)
+                .filter(Objects::nonNull)
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .ifPresent(v -> scores.setConfidenceScore(clamp100(v <= 10 ? v * 10 : v)));
+
         response.setCategoryScores(scores);
     }
-    
+
     private void analyzeQuestionPerformance(Interview interview, InterviewEvaluationResponse response) {
         List<InterviewEvaluationResponse.QuestionPerformance> performances = new ArrayList<>();
-        
+
         for (InterviewQuestion question : interview.getQuestions()) {
             if (question.getAnswer() != null && question.getAnswer().isSubmitted()) {
-                InterviewEvaluationResponse.QuestionPerformance perf = new InterviewEvaluationResponse.QuestionPerformance();
+                InterviewEvaluationResponse.QuestionPerformance perf =
+                        new InterviewEvaluationResponse.QuestionPerformance();
                 perf.setQuestionOrder(question.getQuestionOrder());
                 perf.setQuestionText(question.getQuestionText());
                 perf.setCategory(question.getCategory());
-                
+
                 InterviewAnswer answer = question.getAnswer();
+                perf.setUserAnswer(answer.getAnswerText());
+                perf.setFeedback(answer.getFeedback());
                 perf.setScore(answer.getScore());
                 perf.setRating(answer.getRating());
-                
+                perf.setStrengths(answer.getStrengths() != null
+                        ? new ArrayList<>(answer.getStrengths()) : List.of());
+                perf.setWeaknesses(answer.getImprovements() != null
+                        ? new ArrayList<>(answer.getImprovements()) : List.of());
+
                 if (answer.getTimeTaken() != null) {
                     perf.setTimeTakenSeconds(answer.getTimeTaken().getSeconds());
                     perf.setExceedsExpectedTime(
-                            question.getExpectedTimeMinutes() != null &&
-                            answer.getTimeTaken().getSeconds() > question.getExpectedTimeMinutes() * 60
+                            question.getExpectedTimeMinutes() != null
+                                    && answer.getTimeTaken().getSeconds()
+                                    > question.getExpectedTimeMinutes() * 60L
                     );
                 }
-                
+
                 performances.add(perf);
             }
         }
-        
+
         response.setQuestionPerformances(performances);
     }
-    
+
     private void generateStrengthsAndImprovements(Interview interview, InterviewEvaluationResponse response) {
         List<String> allStrengths = new ArrayList<>();
         List<String> allImprovements = new ArrayList<>();
-        
+
         for (InterviewAnswer answer : interview.getAnswers()) {
             if (answer.getStrengths() != null) {
                 allStrengths.addAll(answer.getStrengths());
@@ -376,16 +676,122 @@ public class EvaluationServiceImpl implements EvaluationService {
                 allImprovements.addAll(answer.getImprovements());
             }
         }
-        
-        // Get top strengths and improvements by frequency
-        response.setTopStrengths(getTopItems(allStrengths, 5));
-        response.setKeyImprovements(getTopItems(allImprovements, 5));
+
+        List<String> topStrengths = getTopItems(allStrengths, 5);
+        List<String> keyImprovements = getTopItems(allImprovements, 5);
+
+        if (topStrengths.isEmpty() && response.getAnsweredQuestions() != null && response.getAnsweredQuestions() > 0) {
+            topStrengths = List.of(
+                    "Completed interview questions with substantive answers",
+                    "Engaged with the " + (interview.getInterviewType() != null
+                            ? interview.getInterviewType().getCategoryLabel()
+                            : "interview") + " round"
+            );
+        }
+        if (keyImprovements.isEmpty() && response.getAnsweredQuestions() != null && response.getAnsweredQuestions() > 0) {
+            keyImprovements = List.of(
+                    "Add more concrete examples and measurable outcomes",
+                    "Tighten structure: situation → action → result"
+            );
+        }
+
+        response.setTopStrengths(topStrengths);
+        response.setKeyImprovements(keyImprovements);
+
+        if (response.getRecommendedPractice() == null || response.getRecommendedPractice().isEmpty()) {
+            response.setRecommendedPractice(buildDefaultPractice(interview, keyImprovements));
+        }
     }
-    
+
+    private List<String> buildDefaultPractice(Interview interview, List<String> improvements) {
+        String round = interview.getInterviewType() != null
+                ? interview.getInterviewType().canonicalize().name()
+                : "TECHNICAL";
+        return switch (round) {
+            case "CODING" -> List.of(
+                    "Practice Arrays, HashMaps, and Sliding Window on LeetCode",
+                    "Drill Trees, Graphs, and DP with complexity analysis",
+                    "Narrate approach out loud in mock coding interviews"
+            );
+            case "SYSTEM_DESIGN" -> List.of(
+                    "Review caching, load balancing, and database sharding patterns",
+                    "Practice designing URL shortener, chat, and feed systems",
+                    "Document trade-offs for consistency vs availability"
+            );
+            case "HR", "BEHAVIORAL" -> List.of(
+                    "Prepare 5 STAR stories for leadership and conflict",
+                    "Practice concise self-introductions tailored to the company",
+                    "Book a mock behavioral interview"
+            );
+            case "MANAGERIAL" -> List.of(
+                    "Prepare ownership and stakeholder-conflict scenarios",
+                    "Practice prioritization frameworks (RICE / ICE)",
+                    "Reflect on mentoring and architecture decision stories"
+            );
+            case "APTITUDE" -> List.of(
+                    "Daily quantitative and logical reasoning drills",
+                    "Timed puzzle and data-interpretation sets",
+                    "Review percentage, ratio, and series patterns"
+            );
+            default -> List.of(
+                    "Deepen core concepts for " + (interview.getRole() != null ? interview.getRole() : "your role"),
+                    improvements.isEmpty() ? "Review weak topics from the scorecard" : "Focus on: " + improvements.get(0),
+                    "Schedule another technical mock interview"
+            );
+        };
+    }
+
+    private void generateDetailedFeedback(Interview interview, InterviewEvaluationResponse response) {
+        if (response.getDetailedFeedback() != null && !response.getDetailedFeedback().isBlank()) {
+            if (response.getRecommendations() == null || response.getRecommendations().isBlank()) {
+                List<String> practice = response.getRecommendedPractice() != null
+                        ? response.getRecommendedPractice() : List.of();
+                response.setRecommendations(practice.isEmpty()
+                        ? "Review your question-wise feedback and practice the recommended topics."
+                        : String.join("\n", practice.stream().map(p -> "• " + p).toList()));
+            }
+            return;
+        }
+
+        StringBuilder feedback = new StringBuilder();
+        double overall = response.getOverallScore() != null ? response.getOverallScore() : 0;
+        feedback.append("Overall Performance:\n");
+        feedback.append("You scored ").append(String.format("%.0f", overall));
+        feedback.append("% (").append(response.getPerformanceLevel() != null
+                ? response.getPerformanceLevel() : "UNRATED").append(").\n\n");
+
+        List<String> strengths = response.getTopStrengths() != null ? response.getTopStrengths() : List.of();
+        List<String> improvements = response.getKeyImprovements() != null ? response.getKeyImprovements() : List.of();
+
+        if (!strengths.isEmpty()) {
+            feedback.append("Key Strengths:\n");
+            strengths.forEach(s -> feedback.append("• ").append(s).append("\n"));
+        }
+        if (!improvements.isEmpty()) {
+            feedback.append("\nAreas for Improvement:\n");
+            improvements.forEach(i -> feedback.append("• ").append(i).append("\n"));
+        }
+
+        response.setDetailedFeedback(feedback.toString());
+
+        List<String> practice = response.getRecommendedPractice() != null
+                ? response.getRecommendedPractice() : List.of();
+        if (!practice.isEmpty()) {
+            response.setRecommendations(String.join("\n", practice.stream().map(p -> "• " + p).toList()));
+        } else if (!improvements.isEmpty()) {
+            response.setRecommendations(
+                    "Based on your performance, we recommend focusing on:\n"
+                            + "1. " + improvements.get(0) + "\n"
+                            + "2. Improve clarity and structure under time pressure\n"
+                            + "3. Review fundamentals in your weaker areas");
+        } else {
+            response.setRecommendations("Retake a practice interview to build a richer scorecard.");
+        }
+    }
+
     private void performSkillsAssessment(Interview interview, InterviewEvaluationResponse response) {
         InterviewEvaluationResponse.SkillsAssessment assessment = new InterviewEvaluationResponse.SkillsAssessment();
-        
-        // Derive demonstrated skills from categories of questions that were answered well (score >= 70)
+
         List<String> demonstratedSkills = interview.getAnswers().stream()
                 .filter(a -> a.getScore() != null && a.getScore() >= 70.0)
                 .map(a -> a.getQuestion().getCategory())
@@ -393,8 +799,7 @@ public class EvaluationServiceImpl implements EvaluationService {
                 .distinct()
                 .limit(6)
                 .collect(Collectors.toList());
-        
-        // Derive skill gaps from categories where the candidate scored poorly (score < 60)
+
         List<String> skillGaps = interview.getAnswers().stream()
                 .filter(a -> a.getScore() != null && a.getScore() < 60.0)
                 .map(a -> a.getQuestion().getCategory())
@@ -402,23 +807,19 @@ public class EvaluationServiceImpl implements EvaluationService {
                 .distinct()
                 .limit(4)
                 .collect(Collectors.toList());
-        
-        // Fallback: if no answers scored, use question categories as demonstrated
-        if (demonstratedSkills.isEmpty()) {
-            demonstratedSkills = interview.getQuestions().stream()
-                    .map(q -> q.getCategory())
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .limit(3)
-                    .collect(Collectors.toList());
+
+        if (demonstratedSkills.isEmpty() && response.getTopStrengths() != null) {
+            demonstratedSkills = response.getTopStrengths().stream().limit(3).collect(Collectors.toList());
         }
-        
+        if (skillGaps.isEmpty() && response.getKeyImprovements() != null) {
+            skillGaps = response.getKeyImprovements().stream().limit(3).collect(Collectors.toList());
+        }
+
         assessment.setDemonstratedSkills(demonstratedSkills);
         assessment.setSkillGaps(skillGaps);
-        
         response.setSkillsAssessment(assessment);
     }
-    
+
     private void generateBenchmarkComparison(Interview interview, InterviewEvaluationResponse response) {
         InterviewEvaluationResponse.BenchmarkComparison comparison = getBenchmarkComparison(
                 interview.getUser().getId(),
@@ -426,31 +827,7 @@ public class EvaluationServiceImpl implements EvaluationService {
         );
         response.setBenchmarkComparison(comparison);
     }
-    
-    private void generateDetailedFeedback(Interview interview, InterviewEvaluationResponse response) {
-        StringBuilder feedback = new StringBuilder();
-        
-        feedback.append("Overall Performance:\n");
-        feedback.append("You scored ").append(String.format("%.1f", response.getOverallScore()));
-        feedback.append(" out of 100, which is ").append(response.getPerformanceLevel()).append(".\n\n");
-        
-        feedback.append("Key Strengths:\n");
-        response.getTopStrengths().forEach(s -> feedback.append("• ").append(s).append("\n"));
-        
-        feedback.append("\nAreas for Improvement:\n");
-        response.getKeyImprovements().forEach(i -> feedback.append("• ").append(i).append("\n"));
-        
-        response.setDetailedFeedback(feedback.toString());
-        
-        // Generate recommendations
-        String recommendations = "Based on your performance, we recommend focusing on:\n" +
-                "1. Practice more " + response.getKeyImprovements().get(0) + " questions\n" +
-                "2. Improve time management for complex problems\n" +
-                "3. Review fundamental concepts in your weak areas";
-        
-        response.setRecommendations(recommendations);
-    }
-    
+
     private String extractUserSkills(User user) {
         // First try to get skills from the user's primary/most recent resume
         try {

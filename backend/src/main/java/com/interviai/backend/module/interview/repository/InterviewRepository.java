@@ -28,6 +28,8 @@ public interface InterviewRepository extends JpaRepository<Interview, UUID> {
     Page<Interview> findByUser(User user, Pageable pageable);
     
     List<Interview> findByUser(User user);
+
+    List<Interview> findByUserOrderByCreatedAtDesc(User user);
     
     long countByUser(User user);
     
